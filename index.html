@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mapa de Arequipa</title>
+    <!-- Librerías de Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    
+    <title>Prototipo de Interfaz Móvil</title>
+    
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuración de Tailwind para colores y fuente -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-dark': '#2E8B57', // Verde Oscuro (Header)
+                        'primary-light': '#D3EEDA', // Verde Claro (Drawer BG)
+                        'secondary-orange': '#FF6B3D', // Naranja (Home Botón)
+                        'canjear-button': '#78B3B0', // Verde Menta para botones Canjear
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'custom': '0 4px 10px rgba(0, 0, 0, 0.1)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos generales para simular el contenedor móvil */
+        body {
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        /* Contenedor principal del teléfono */
+        .phone-container {
+            width: 100%;
+            max-width: 390px; /* Ancho típico de un teléfono */
+            height: 844px; /* Altura típica */
+            border: 1px solid #ccc;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: white;
+            position: relative;
+        }
+
+        /* Estilo para las pantallas (simulan una vista de aplicación) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            transform: translateX(100%);
+            opacity: 0;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen.active {
+            transform: translateX(0);
+            opacity: 1;
+            z-index: 10;
+        }
+
+        .screen.inactive {
+            /* Mueve las pantallas inactivas fuera de la vista para transicionar */
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+        
+        /* Estilos específicos para el Drawer */
+        #drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80%; /* Ancho del drawer */
+            max-width: 300px;
+            height: 100%;
+            background-color: #D3EEDA;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 20;
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #drawer.open {
+            transform: translateX(0);
+        }
+
+        /* Estilo para simular el mapa de Google Maps (IMAGEN ESTATICA) */
+        .map-placeholder {
+            /* Usamos una imagen de placeholder que se parezca más a un mapa real */
+            background-image: url('https://placehold.co/390x600/f5f5f5/1f1e1f?text=Mapa+de+Recoleccion+%7C+SIN+TAC');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            flex-grow: 1;
+        }
+
+        /* Estilo para el ícono de edición del perfil */
+        .edit-icon {
+            cursor: pointer;
+        }
+
+        /* NUEVO: Estilo para la opción de problema seleccionada */
+        .selected-problem {
+            border-color: #2E8B57 !important; /* Borde verde oscuro */
+            background-color: #D3EEDA !important; /* Fondo verde claro */
+            box-shadow: 0 0 0 2px rgba(46, 139, 87, 0.5); /* Anillo de enfoque simulado */
+        }
+    </style>
+</head>
+<body>
+
+<div class="phone-container" id="app-container">
+
+    <!-- 1. Drawer (Menú Lateral) -->
+    <div id="drawer" class="flex flex-col rounded-r-xl">
+        <!-- Encabezado del Drawer -->
+        <div class="bg-primary-dark p-6 flex items-center shadow-md">
+            <!-- Icono de reciclaje con color blanco -->
+            <svg class="w-6 h-6 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0020.57 9m-1.554-1.554L15 5m4.57 4h-4.57m3.305 4H10m4.615 4h2.527M12 20.57A8.001 8.001 0 0015 20.57M4 20.57A8.001 8.001 0 0012 20.57"></path>
+            </svg>
+            <span class="text-white font-bold text-lg">Pedido Medio</span>
+        </div>
+        
+        <!-- Items de Navegación -->
+        <div class="flex-grow p-4 space-y-2">
+            <!-- Los botones del drawer usan la clase 'drawer-nav' para navegar -->
+            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="perfil">Perfil</button>
+            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="historial">Historial</button>
+            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="notificaciones">Notificaciones</button>
+            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="faq">Preguntas frecuentes</button>
+            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="publicidad">Publicidad asociados</button>
+        </div>
+
+        <!-- Pie de página con Cerrar Sesión -->
+        <div class="p-4 border-t border-primary-dark/20">
+            <button class="w-full text-left py-2 px-2 text-primary-dark font-semibold hover:text-primary-dark/80 transition duration-150" onclick="navigateTo('login')">Cerrar sesión</button>
+        </div>
+    </div>
+    
+    <!-- PANTALLAS DE LA APLICACIÓN -->
+    
+    <!-- 2. Pantalla de Inicio de Sesión (login) - Activa por defecto -->
+    <div id="login" class="screen active p-6 flex flex-col justify-center">
+        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Iniciar Sesión</h2>
+        <div class="space-y-6">
+            <div>
+                <label for="login-email" class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
+                <input type="email" id="login-email" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="email@ejemplo.com" />
+            </div>
+            <div>
+                <label for="login-password" class="text-sm font-semibold text-gray-700 block mb-1">Contraseña</label>
+                <input type="password" id="login-password" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="Contraseña" />
+            </div>
+        </div>
+        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-8 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">INICIA SESIÓN</button>
+        <button class="text-sm text-primary-dark font-medium text-center mt-4 w-full" onclick="navigateTo('olvido_contrasena')">¿Olvidaste tu contraseña?</button>
+        <div class="mt-8 text-center">
+            <p class="text-sm text-gray-600 mb-2">¿No tienes cuenta?</p>
+            <button class="text-primary-dark font-bold text-lg hover:text-primary-dark/80" onclick="navigateTo('registro')">Regístrate</button>
+        </div>
+    </div>
+    
+    <!-- 17. NUEVA PANTALLA: Olvido Contraseña -->
+    <div id="olvido_contrasena" class="screen p-6 pt-12">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md -mx-6 -mt-12 mb-8">
+            <button class="mr-4" onclick="navigateTo('login')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Recuperar Contraseña</h1>
+        </div>
+        <h2 class="text-2xl font-bold mb-4 text-center text-primary-dark">Recupera tu cuenta</h2>
+        <p class="text-center text-gray-600 mb-8">Ingresa el email asociado a tu cuenta para enviarte un enlace de recuperación.</p>
+        <div>
+            <label for="recover-email" class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
+            <input type="email" id="recover-email" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="email@ejemplo.com" />
+        </div>
+        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-10 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('login')">Enviar Enlace</button>
+    </div>
+
+    <!-- 3. Pantalla de Registro -->
+    <div id="registro" class="screen p-6 pt-12">
+        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Registro</h2>
+        <div class="space-y-6">
+            <div>
+                <label for="reg-email" class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
+                <input type="email" id="reg-email" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="ejemplo@gmail.com" />
+            </div>
+            <div>
+                <label for="reg-password" class="text-sm font-semibold text-gray-700 block mb-1">Contraseña</label>
+                <input type="password" id="reg-password" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="crea una contraseña" />
+                <span class="text-xs text-gray-500 mt-1 block">Debe tener al menos 8 caracteres</span>
+            </div>
+            <div>
+                <label for="reg-confirm" class="text-sm font-semibold text-gray-700 block mb-1">Confirmar contraseña</label>
+                <input type="password" id="reg-confirm" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="repetir contraseña" />
+            </div>
+        </div>
+        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-10 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('registro_telefono')">Registrarse</button>
+    </div>
+
+    <!-- 4. Pantalla de Registro - Teléfono -->
+    <div id="registro_telefono" class="screen p-6 pt-12">
+        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Registro con teléf...</h2>
+        <p class="text-center text-gray-600 mb-6">Por favor confirma con un código de país e ingresa tu número de teléfono.</p>
+        <div class="flex space-x-2 mb-8">
+            <select class="w-1/4 p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark">
+                <option>+51 Perú</option>
+                <option>+52 México</option>
+            </select>
+            <input type="tel" class="w-3/4 p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark" placeholder="000 000 000" />
+        </div>
+        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-4 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('introducir_codigo')">Registrarse</button>
+    </div>
+
+    <!-- 5. Pantalla de Introducir Código -->
+    <div id="introducir_codigo" class="screen p-6 pt-12">
+        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Introducir código</h2>
+        <p class="text-center text-gray-600 mb-6">Hemos enviado un sms con un código de activación a tu teléfono:</p>
+        <div class="flex justify-center space-x-2 mb-8">
+            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
+            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
+            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
+            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
+            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
+        </div>
+        <p class="text-center text-sm text-gray-500 mb-4">Código incorrecto. Ingresa de nuevo.</p>
+        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-4 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">Verificar</button>
+        <a href="#" class="text-sm text-primary-dark font-medium text-center mt-4">Enviar código de nuevo: 00:20</a>
+    </div>
+    
+    <!-- 6. Pantalla Home -->
+    <div id="home" class="screen">
+        <!-- Header de la App (Barra superior) -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <!-- Botón para abrir el drawer -->
+            <button class="mr-4" onclick="toggleDrawer()">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Home</h1>
+            <!-- Icono de Notificaciones -->
+            <button onclick="navigateTo('notificaciones')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Contenido Principal -->
+        <div class="p-6 flex flex-col flex-grow">
+            <div class="bg-white p-6 rounded-xl shadow-lg mb-8 text-center border-t-4 border-primary-dark">
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">SINTAC</h2>
+                <p class="text-sm text-gray-600">Recolección de residuos</p>
+                <p class="text-sm text-gray-500 mt-1">¡Reciclar es un esfuerzo de todos!</p>
+            </div>
+            
+            <!-- BOTÓN: Solicitar recolección -->
+            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold mb-4 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('solicitar_recoleccion')">Solicitar recolección</button>
+            
+            <button class="bg-primary-dark/80 text-white p-4 rounded-xl font-semibold mb-8 shadow-custom transition duration-200 hover:bg-primary-dark/70" onclick="navigateTo('historial')">Ver historial de recojo</button>
+
+            <div class="bg-gray-100 p-4 rounded-xl text-center flex-grow flex flex-col justify-center">
+                <p class="text-sm text-gray-600 mb-4">¿Quieres canjear puntos?</p>
+                <button class="bg-secondary-orange text-white p-3 rounded-xl font-semibold shadow-custom transition duration-200 hover:bg-secondary-orange/90" onclick="navigateTo('recompensas')">Ver Recompensas</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 7. Pantalla de Perfil (perfil) -->
+    <div id="perfil" class="screen">
+        <!-- Header con botón de regreso y EDITAR -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('home')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Perfil</h1>
+            <!-- BOTÓN CONECTADO: Editar Perfil -->
+            <button class="edit-icon" onclick="navigateTo('editar_perfil')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+            </button>
+        </div>
+        <!-- Contenido de Perfil -->
+        <div class="p-6 space-y-4">
+            <div class="flex items-center space-x-4 border-b pb-4">
+                <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-lg font-bold text-gray-600">FM</div>
+                <div>
+                    <p class="font-bold text-lg">Fausto Medina</p>
+                    <p class="text-sm text-gray-500">Usuario</p>
+                </div>
+            </div>
+            <!-- Datos -->
+            <div class="space-y-4">
+                <div class="flex justify-between items-center py-2 border-b">
+                    <span class="font-semibold text-gray-700">Dirección</span>
+                    <span class="text-gray-500">Calle los avellanos 123</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b">
+                    <span class="font-semibold text-gray-700">Horario</span>
+                    <span class="text-gray-500">09:00</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b">
+                    <span class="font-semibold text-gray-700">Email</span>
+                    <span class="text-gray-500">ejemplo@gmail.com</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b">
+                    <span class="font-semibold text-gray-700">Contraseña</span>
+                    <span class="text-gray-500">************</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 18. NUEVA PANTALLA: Editar Perfil -->
+    <div id="editar_perfil" class="screen">
+        <!-- Header con botón de regreso -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('perfil')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Editar Perfil</h1>
+        </div>
+        <div class="p-6 space-y-6 overflow-y-auto flex-grow">
+            <!-- Campos -->
+            <div>
+                <label class="text-sm font-semibold text-gray-700 block mb-1">Nombre</label>
+                <input type="text" value="Fausto Medina" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-gray-700 block mb-1">Dirección</label>
+                <input type="text" value="Calle los avellanos 123" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-gray-700 block mb-1">Horario</label>
+                <input type="text" value="09:00" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
+                <input type="email" value="ejemplo@gmail.com" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-gray-700 block mb-1">Nueva Contraseña</label>
+                <input type="password" placeholder="Ingresa nueva contraseña" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
+            </div>
+        </div>
+        <!-- Botón Guardar -->
+        <div class="p-6 pt-0">
+            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('perfil')">Guardar Cambios</button>
+        </div>
+    </div>
+    
+    <!-- 8. Pantalla de Historial -->
+    <div id="historial" class="screen">
+        <!-- Header con botón de regreso -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('home')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Historial</h1>
+        </div>
+        <!-- Contenido de Historial -->
+        <div class="p-6 flex flex-col flex-grow">
+            <div class="space-y-4 flex-grow">
+                <div class="bg-gray-50 p-4 rounded-lg shadow-sm border-l-4 border-primary-dark">
+                    <p class="font-bold text-gray-800">22/08/2025</p>
+                    <p class="text-sm text-gray-600">Horario: 10:20</p>
+                    <p class="text-xs text-gray-500">Dirección: Calle los avellanos 123</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg shadow-sm border-l-4 border-primary-dark">
+                    <p class="font-bold text-gray-800">06/06/2025</p>
+                    <p class="text-sm text-gray-600">Horario: 09:45</p>
+                    <p class="text-xs text-gray-500">Dirección: Esmeralda 30A</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg shadow-sm border-l-4 border-primary-dark">
+                    <p class="font-bold text-gray-800">15/01/2025</p>
+                    <p class="text-sm text-gray-600">Horario: 11:30</p>
+                    <p class="text-xs text-gray-500">Dirección: Rodriguer Camen 1568</p>
+                </div>
+            </div>
+            <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-6 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('mapa_recoleccion')">Ver Mapa</button>
+        </div>
+    </div>
+    
+    <!-- 9. Pantalla de Notificaciones -->
+    <div id="notificaciones" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('home')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Notificaciones</h1>
+        </div>
+        <!-- Contenido -->
+        <div class="p-6">
+            <div class="flex justify-between items-center py-4 border-b">
+                <span class="font-semibold text-gray-700">Permitir notificaciones</span>
+                <div class="w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer">
+                    <div class="toggle-dot w-4 h-4 bg-white rounded-full shadow-md transform translate-x-0 transition duration-300"></div>
+                </div>
+            </div>
+            <div class="mt-4 space-y-4">
+                <div class="bg-primary-light/50 p-3 rounded-lg border-l-4 border-primary-dark">
+                    <p class="font-semibold text-gray-800">Recolección programada</p>
+                    <p class="text-sm text-gray-600">Tu recolección del día 22/08 ha sido confirmada.</p>
+                </div>
+                <div class="bg-primary-light/50 p-3 rounded-lg border-l-4 border-primary-dark">
+                    <p class="font-semibold text-gray-800">¡Nuevas recompensas!</p>
+                    <p class="text-sm text-gray-600">Tenemos nuevos cupones para ti.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 10. Pantalla de Preguntas Frecuentes -->
+    <div id="faq" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('home')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Preguntas frecuentes</h1>
+        </div>
+        <div class="p-6 space-y-4">
+            <!-- Preguntas -->
+            <div class="border rounded-lg overflow-hidden shadow-sm">
+                <button class="w-full text-left p-4 bg-gray-50 font-semibold text-gray-700">¿Cómo solicito una recolección?</button>
+                <div class="p-4 text-sm text-gray-600 border-t">
+                    <p>Puedes solicitar una recolección desde la pantalla de Inicio, usando el botón "Solicitar recolección".</p>
+                </div>
+            </div>
+            <div class="border rounded-lg overflow-hidden shadow-sm">
+                <button class="w-full text-left p-4 bg-gray-50 font-semibold text-gray-700">¿Qué tipo de residuos aceptan?</button>
+                <div class="p-4 text-sm text-gray-600 border-t">
+                    <p>Aceptamos papel, cartón, plástico, vidrio y metales. Deben estar limpios y separados.</p>
+                </div>
+            </div>
+            <div class="border rounded-lg overflow-hidden shadow-sm">
+                <button class="w-full text-left p-4 bg-gray-50 font-semibold text-gray-700">¿Cómo canjeo mis puntos?</button>
+                <div class="p-4 text-sm text-gray-600 border-t">
+                    <p>Visita la sección "Ver Recompensas" en el Home para ver los cupones disponibles y canjear tus puntos acumulados.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 11. Publicidad -->
+    <div id="publicidad" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('home')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Publicidad Asociados</h1>
+        </div>
+        <div class="p-6">
+            <div class="bg-yellow-100 p-6 rounded-xl border-2 border-yellow-400 text-center">
+                <h3 class="font-bold text-lg text-yellow-800 mb-2">¡Oferta Especial!</h3>
+                <p class="text-sm text-yellow-700">Recibe un 15% de descuento en tu próxima compra de productos ecológicos en la tienda "Green Life".</p>
+                <button class="mt-4 bg-yellow-500 text-white p-2 rounded-lg font-semibold text-sm">Ver Cupón</button>
+            </div>
+            <div class="mt-6 bg-blue-100 p-6 rounded-xl border-2 border-blue-400 text-center">
+                <h3 class="font-bold text-lg text-blue-800 mb-2">¡Nuevo Socio!</h3>
+                <p class="text-sm text-blue-700">Te presentamos a nuestro nuevo asociado, la Fundación "Bosques Vivos".</p>
+                <button class="mt-4 bg-blue-500 text-white p-2 rounded-lg font-semibold text-sm">Visitar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 12. Recompensas -->
+    <div id="recompensas" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('home')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow uppercase">Recompensas</h1>
+        </div>
+        <div class="p-6 overflow-y-auto flex-grow">
+            <!-- Tus Recompensas -->
+            <div class="mb-8 p-4 border border-gray-100 rounded-xl shadow-md">
+                <h2 class="text-sm font-bold text-gray-800 mb-1 tracking-wider uppercase">Tus Recompensas</h2>
+                <p class="text-xs text-gray-600 mb-4">Canjea tus puntos por beneficio</p>
+                <p class="text-lg font-semibold text-gray-800 mb-2 flex items-center">
+                    120 / 200 puntos <span class="text-yellow-500 text-2xl ml-2">★</span>
+                </p>
+                <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-primary-dark transition-all duration-500 ease-out" style="width: 60%;"></div>
+                </div>
+            </div>
+            <!-- Catálogo de recompensas -->
+            <h2 class="text-sm font-bold text-gray-800 mb-4 tracking-wider uppercase">Catálogo de recompensas</h2>
+            <div class="space-y-4">
+                <!-- Recompensa 1 -->
+                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
+                    <p class="font-semibold text-gray-700">COMBO KFC</p>
+                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
+                </div>
+                <!-- Recompensa 2 -->
+                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
+                    <p class="font-semibold text-gray-700">COMBO CINE</p>
+                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
+                </div>
+                <!-- Recompensa 3 -->
+                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
+                    <p class="font-semibold text-gray-700">COMBO ROPA</p>
+                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
+                </div>
+                <!-- Recompensa 4 -->
+                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
+                    <p class="font-semibold text-gray-700">COMBO SORPRESA</p>
+                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 13. Canjear Confirmacion -->
+    <div id="canjear_confirmacion" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('recompensas')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow uppercase">Canjear Recompensa</h1>
+        </div>
+        <div class="p-6 flex flex-col items-center text-center flex-grow justify-center">
+             <!-- Icono de Éxito -->
+            <div class="w-24 h-24 bg-primary-dark/80 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-4">¡Canje Exitoso!</h2>
+            <p class="text-gray-700 text-lg mb-8">Has canjeado el COMBO KFC por 80 puntos.</p>
+            <p class="text-sm text-gray-500 mb-10">Revisa tu correo electrónico para obtener tu cupón.</p>
+            <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold w-full max-w-xs shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('recompensas')">Volver a Recompensas</button>
+        </div>
+    </div>
+    
+    <!-- 14. Solicitar Recolección -->
+    <div id="solicitar_recoleccion" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('home')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Solicitar recolección</h1>
+        </div>
+        <!-- Contenido -->
+        <div class="p-6 overflow-y-auto flex-grow">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Completa la siguiente información</h2>
+            <p class="text-sm text-gray-600 mb-6">
+                ¿Seleccione el distrito donde se encuentra el contenedor lleno?
+                <br>
+                <span class="text-xs text-gray-500">Ten en cuenta que el distrito es referencial</span>
+            </p>
+            <!-- Selector Distrito -->
+            <select class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark mb-6 text-gray-700">
+                <option selected disabled>Seleccione el distrito</option>
+                <option>CAYMA</option>
+                <option>YANAHUARA</option>
+                <option>SOCABAYA</option>
+                <option>CERRO COLORADO</option>
+            </select>
+            <!-- Seccion mapa -->
+            <div class="mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">MAPA</h3>
+                <button class="w-full flex justify-between items-center p-4 border border-gray-300 rounded-xl shadow-sm hover:bg-gray-50 transition duration-150" onclick="navigateTo('mapa_recoleccion')">
+                    <span class="text-gray-700">MAPA</span>
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+            <!-- Sección PROBLEMA -->
+            <div class="mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">SELECCIONE PROBLEMA</h3>
+                <button class="w-full flex justify-between items-center p-4 border border-gray-300 rounded-xl shadow-sm hover:bg-gray-50 transition duration-150" onclick="navigateTo('seleccionar_problema')">
+                    <span class="text-gray-700">SELECCIONE PROBLEMA</span>
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+        </div>
+        <!-- Botón confirmar -->
+        <div class="p-6 pt-0">
+            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('recoleccion_confirmada')">CONFIRMAR SOLICITUD</button>
+        </div>
+    </div>
+    
+    <!-- 20. Seleccionar Problema -->
+    <div id="seleccionar_problema" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('solicitar_recoleccion')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Seleccionar Problema</h1>
+        </div>
+        <div class="p-6 space-y-4 flex-grow">
+            <p class="text-sm text-gray-600 mb-4">Por favor, elige el tipo de problema para reportar:</p>
+            <!-- Opciones -->
+            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
+                <p class="font-semibold text-gray-800">Contenedor dañado o roto</p>
+            </div>
+            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
+                <p class="font-semibold text-gray-800">Ubicación incorrecta o bloqueada</p>
+            </div>
+            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
+                <p class="font-semibold text-gray-800">Cambio de tipo de residuo</p>
+            </div>
+            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
+                <p class="font-semibold text-gray-800">Otro (Describe en el detalle)</p>
+            </div>
+            <textarea placeholder="Detalles adicionales..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark mt-4 h-24"></textarea>
+        </div>
+        <!-- Confirmar botón -->
+        <div class="p-6 pt-0">
+            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('solicitar_recoleccion')">Confirmar</button>
+        </div>
+    </div>
+    
+    <!-- 14. Recolección Confirmada -->
+    <div id="recoleccion_confirmada" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('solicitar_recoleccion')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Recolección confirmada</h1>
+        </div>
+        <!-- Contenido -->
+        <div class="p-6 flex flex-col items-center text-center flex-grow justify-center">
+            <!-- Icono -->
+            <div class="w-32 h-32 bg-primary-light/80 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-16 h-16 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0020.57 9m-1.554-1.554L15 5m4.57 4h-4.57m3.305 4H10m4.615 4h2.527M12 20.57A8.001 8.001 0 0015 20.57M4 20.57A8.001 8.001 0 0012 20.57"></path>
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-4">¡Estamos en camino!</h2>
+            <p class="text-gray-700 text-lg mb-6">Hora estimada: 14:15 hs</p>
+            <!-- Barra progreso -->
+            <div class="w-full max-w-xs mb-8">
+                <p class="text-sm text-gray-600 mb-2">Preparando recolección</p>
+                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-primary-dark transition-all duration-500 ease-out" style="width: 75%;"></div>
+                </div>
+            </div>
+            <!-- Acciones -->
+            <div class="w-full max-w-xs space-y-4">
+                <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">Volver a inicio</button>
+                <button class="bg-white text-primary-dark border border-primary-dark p-3 rounded-xl font-semibold w-full shadow-sm transition duration-200 hover:bg-gray-100" onclick="navigateTo('cancelar_confirmacion')">Cancelar recolección</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 21. Cancelar Confirmacion -->
+    <div id="cancelar_confirmacion" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('recoleccion_confirmada')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Cancelar Recolección</h1>
+        </div>
+        <div class="p-6 flex flex-col items-center text-center flex-grow justify-center">
+            <!-- Icono advertencia -->
+            <div class="w-24 h-24 bg-secondary-orange/80 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.772-1.333-2.694-1.333-3.464 0L3.3 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-4">¿Estás seguro?</h2>
+            <p class="text-gray-700 text-lg mb-8">Si cancelas ahora, perderás tu lugar en la cola de recolección.</p>
+            <!-- Botones -->
+            <div class="w-full max-w-xs space-y-4">
+                <button class="bg-secondary-orange text-white p-3 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-secondary-orange/90" onclick="navigateTo('home')">Sí, Cancelar</button>
+                <button class="bg-white text-primary-dark border border-primary-dark p-3 rounded-xl font-semibold w-full shadow-sm transition duration-200 hover:bg-gray-100" onclick="navigateTo('recoleccion_confirmada')">No, Volver</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 22. Mapa en vivo -->
+    <div id="mapa_recoleccion" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('solicitar_recoleccion')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Solicitar recolección</h1>
+        </div>
+        <!-- Área del mapa -->
+        <div class="map-placeholder flex-grow relative" id="map" style="height: 600px;">
+            <!-- Botón fijo en el mapa -->
+            <button class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-primary-dark text-white p-3 rounded-xl font-semibold shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('detalle_recoleccion')">
+                Detalle
+            </button>
+        </div>
+    </div>
+    
+    <!-- 23. Detalle de Recolección -->
+    <div id="detalle_recoleccion" class="screen">
+        <!-- Header -->
+        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
+            <button class="mr-4" onclick="navigateTo('mapa_recoleccion')">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <h1 class="text-xl font-bold flex-grow">Detalle Recolección</h1>
+        </div>
+        <div class="p-6 space-y-6">
+            <!-- Información -->
+            <div class="bg-primary-light/50 p-4 rounded-xl text-center">
+                <p class="text-lg font-bold text-primary-dark">¡Recolector en camino!</p>
+                <p class="text-sm text-gray-700">Llegada estimada: 14:15 hs</p>
+            </div>
+            <div class="space-y-3">
+                <h3 class="text-lg font-bold text-gray-800 border-b pb-1">Información del Servicio</h3>
+                <div class="flex justify-between text-gray-700">
+                    <span class="font-semibold">Dirección de Recolección:</span>
+                    <span>Calle los avellanos 123</span>
+                </div>
+                <div class="flex justify-between text-gray-700">
+                    <span class="font-semibold">Distrito:</span>
+                    <span>CAYMA</span>
+                </div>
+                <div class="flex justify-between text-gray-700">
+                    <span class="font-semibold">Estado:</span>
+                    <span class="text-primary-dark font-bold">En Progreso</span>
+                </div>
+                <div class="flex justify-between text-gray-700">
+                    <span class="font-semibold">Problemas Reportados:</span>
+                    <span>Ninguno</span>
+                </div>
+            </div>
+            <button class="bg-secondary-orange text-white p-3 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-secondary-orange/90" onclick="navigateTo('mapa_recoleccion')">Ver Mapa en vivo</button>
+        </div>
+    </div>
+    
+    <!-- 16. Verificación Teléfono -->
+    <div id="verificacion_telefono" class="screen p-6 flex items-center justify-center">
+        <div class="text-center">
+            <p class="text-xl font-bold text-primary-dark mb-4">Verificación de Teléfono</p>
+            <p class="text-gray-600">Esta pantalla simula el flujo de verificación. Regresa al Home para continuar.</p>
+            <button class="mt-8 bg-primary-dark text-white p-3 rounded-xl font-semibold transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">Ir a Home</button>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+    // Variables
+    let currentScreenId = 'login';
+    const drawer = document.getElementById('drawer');
+
+    // Función de navegación
+    function navigateTo(targetId) {
+        if (drawer.classList.contains('open')) {
+            toggleDrawer();
+            setTimeout(() => { _transitionScreen(targetId); }, 300);
+        } else {
+            _transitionScreen(targetId);
+        }
+    }
+
+    function _transitionScreen(targetId) {
+        const currentScreen = document.getElementById(currentScreenId);
+        const targetScreen = document.getElementById(targetId);
+        if (!targetScreen) { console.error(`Pantalla ${targetId} no existe.`); return; }
+
+        if (currentScreen) {
+            currentScreen.classList.remove('active');
+            currentScreen.classList.add('inactive');
+        }
+        targetScreen.classList.remove('inactive');
+        targetScreen.classList.add('active');
+        currentScreenId = targetId;
+
+        setTimeout(() => {
+            if (currentScreen && currentScreen.id !== currentScreenId) {
+                currentScreen.classList.remove('inactive');
+            }
+        }, 300);
+    }
+
+    function toggleDrawer() {
+        drawer.classList.toggle('open');
+    }
+
+    function selectProblem(element) {
+        document.querySelectorAll('.problem-option').forEach(opt => opt.classList.remove('selected-problem'));
+        element.classList.add('selected-problem');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Inicializar pantallas
+        document.querySelectorAll('.screen').forEach(s => {
+            s.classList.toggle('active', s.id === currentScreenId);
+            s.classList.toggle('inactive', s.id !== currentScreenId);
+        });
+        // Asignar eventos a botones del drawer
+        document.querySelectorAll('.drawer-nav').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.getAttribute('data-target');
+                navigateTo(target);
+            });
+        });
+    });
+
+    // ==========================
+    // Código mapa
+    // ==========================
+    var arequipaCentro = [-16.409047, -71.537451];
+
+    var map = L.map('map').setView(arequipaCentro, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker; // marcador global
+
+    const ruta = [
+        [-16.409047, -71.537451],
+        [-16.410000, -71.538000],
+        [-16.411000, -71.539000],
+        [-16.412000, -71.540000],
+        [-16.413000, -71.541000],
+    ];
+
+    let idx = 0;
+
+    function moverGPS(lat, lon) {
+        if (!marker) {
+            marker = L.marker([lat, lon]).addTo(map);
+        } else {
+            marker.setLatLng([lat, lon]);
+        }
+        map.setView([lat, lon], 13);
+    }
+
+    setInterval(() => {
+        moverGPS(ruta[idx][0], ruta[idx][1]);
+        idx = (idx + 1) % ruta.length;
+    }, 2000);
+</script>
+</body>
+</html>
