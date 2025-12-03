@@ -3,878 +3,786 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mapa de Arequipa</title>
-    <!-- Librerías de Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <title>Panel de Administrador - SINTAC Prototipo (6/5 IoT Simulación)</title>
     
-    <title>Prototipo de Interfaz Móvil</title>
-    
-    <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
-    <!-- Configuración de Tailwind para colores y fuente -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        'primary-dark': '#2E8B57', // Verde Oscuro (Header)
-                        'primary-light': '#D3EEDA', // Verde Claro (Drawer BG)
-                        'secondary-orange': '#FF6B3D', // Naranja (Home Botón)
-                        'canjear-button': '#78B3B0', // Verde Menta para botones Canjear
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        'primary-dark': ' #004D40', // Verde Oscuro (Sidebar/Header)
+                        'primary-light': '#D3EEDA', // Verde Claro (Fondo general y algunos elementos)
+                        'secondary-orange': '#FF6B3D', // Naranja (Botón Resaltado, indicadores de acción)
+                        'canjear-button': '#78B3B0', // Verde Menta
+                        'alert-critical': '#EF4444', // Rojo para Alertas IoT
+                        'alert-low': '#FBBF24', // Amarillo para Alertas Menores
                     },
                     boxShadow: {
-                        'custom': '0 4px 10px rgba(0, 0, 0, 0.1)',
+                        'custom': '0 4px 12px rgba(0, 0, 0, 0.15)', // Sombra más profesional
                     }
                 }
             }
         }
     </script>
     <style>
-        /* Estilos generales para simular el contenedor móvil */
         body {
             background-color: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        }
+        .sidebar {
+            width: 250px;
             min-height: 100vh;
         }
-        /* Contenedor principal del teléfono */
-        .phone-container {
-            width: 100%;
-            max-width: 390px; /* Ancho típico de un teléfono */
-            height: 844px; /* Altura típica */
-            border: 1px solid #ccc;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-            border-radius: 20px;
-            overflow: hidden;
-            background-color: white;
-            position: relative;
+        .main-content {
+            margin-left: 250px;
         }
-
-        /* Estilo para las pantallas (simulan una vista de aplicación) */
-        .screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: white;
-            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-            transform: translateX(100%);
-            opacity: 0;
-            z-index: 5;
-            display: flex;
-            flex-direction: column;
+        /* Estilo para el elemento de navegación activo en el sidebar */
+        .nav-item.active {
+            background-color: #2E8B57;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            /* Borde izquierdo para destacar aún más */
+            border-left: 4px solid #FF6B3D; 
         }
-
-        .screen.active {
-            transform: translateX(0);
-            opacity: 1;
-            z-index: 10;
+        .nav-item:hover {
+             /* Mejor efecto hover */
+            background-color: #4aae72; 
         }
-
-        .screen.inactive {
-            /* Mueve las pantallas inactivas fuera de la vista para transicionar */
-            transform: translateX(-100%);
-            opacity: 0;
+        .admin-screen {
+            display: none;
+            animation: fadeIn 0.5s ease-out;
         }
-        
-        /* Estilos específicos para el Drawer */
-        #drawer {
+        .admin-screen.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Estilos de Modal */
+        .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
-            width: 80%; /* Ancho del drawer */
-            max-width: 300px;
+            width: 100%;
             height: 100%;
-            background-color: #D3EEDA;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 20;
-            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.2);
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
         }
-
-        #drawer.open {
-            transform: translateX(0);
+        /* Garantizar que el modal content no sea demasiado grande en pantallas pequeñas */
+        .modal-content {
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 90%;
+            max-width: 500px;
+            animation: slideIn 0.3s ease-out;
         }
-
-        /* Estilo para simular el mapa de Google Maps (IMAGEN ESTATICA) */
-        .map-placeholder {
-            /* Usamos una imagen de placeholder que se parezca más a un mapa real */
-            background-image: url('https://placehold.co/390x600/f5f5f5/1f1e1f?text=Mapa+de+Recoleccion+%7C+SIN+TAC');
-            background-size: cover;
-            background-position: center;
-            position: relative;
-            flex-grow: 1;
-        }
-
-        /* Estilo para el ícono de edición del perfil */
-        .edit-icon {
-            cursor: pointer;
-        }
-
-        /* NUEVO: Estilo para la opción de problema seleccionada */
-        .selected-problem {
-            border-color: #2E8B57 !important; /* Borde verde oscuro */
-            background-color: #D3EEDA !important; /* Fondo verde claro */
-            box-shadow: 0 0 0 2px rgba(46, 139, 87, 0.5); /* Anillo de enfoque simulado */
+        @keyframes slideIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
-<body>
+<body class="flex">
 
-<div class="phone-container" id="app-container">
-
-    <!-- 1. Drawer (Menú Lateral) -->
-    <div id="drawer" class="flex flex-col rounded-r-xl">
-        <!-- Encabezado del Drawer -->
-        <div class="bg-primary-dark p-6 flex items-center shadow-md">
-            <!-- Icono de reciclaje con color blanco -->
-            <svg class="w-6 h-6 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0020.57 9m-1.554-1.554L15 5m4.57 4h-4.57m3.305 4H10m4.615 4h2.527M12 20.57A8.001 8.001 0 0015 20.57M4 20.57A8.001 8.001 0 0012 20.57"></path>
-            </svg>
-            <span class="text-white font-bold text-lg">Pedido Medio</span>
+    <div class="sidebar fixed top-0 left-0 bg-primary-dark shadow-2xl flex flex-col z-20">
+        
+        <div class="bg-primary-dark p-6 flex items-center justify-center border-b border-primary-light/10">
+            <svg class="w-8 h-8 text-white mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0020.57 9m-1.554-1.554L15 5m4.57 4h-4.57m3.305 4H10m4.615 4h2.527M12 20.57A8.001 8.001 0 0015 20.57M4 20.57A8.001 8.001 0 0012 20.57"></path></svg>
+            <span class="text-white font-extrabold text-xl tracking-wide">SINTAC Admin</span>
         </div>
         
-        <!-- Items de Navegación -->
         <div class="flex-grow p-4 space-y-2">
-            <!-- Los botones del drawer usan la clase 'drawer-nav' para navegar -->
-            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="perfil">Perfil</button>
-            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="historial">Historial</button>
-            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="notificaciones">Notificaciones</button>
-            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="faq">Preguntas frecuentes</button>
-            <button class="drawer-nav w-full text-left py-3 px-2 rounded-lg text-gray-700 hover:bg-primary-light/70 transition duration-150" data-target="publicidad">Publicidad asociados</button>
-        </div>
-
-        <!-- Pie de página con Cerrar Sesión -->
-        <div class="p-4 border-t border-primary-dark/20">
-            <button class="w-full text-left py-2 px-2 text-primary-dark font-semibold hover:text-primary-dark/80 transition duration-150" onclick="navigateTo('login')">Cerrar sesión</button>
-        </div>
-    </div>
-    
-    <!-- PANTALLAS DE LA APLICACIÓN -->
-    
-    <!-- 2. Pantalla de Inicio de Sesión (login) - Activa por defecto -->
-    <div id="login" class="screen active p-6 flex flex-col justify-center">
-        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Iniciar Sesión</h2>
-        <div class="space-y-6">
-            <div>
-                <label for="login-email" class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
-                <input type="email" id="login-email" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="email@ejemplo.com" />
-            </div>
-            <div>
-                <label for="login-password" class="text-sm font-semibold text-gray-700 block mb-1">Contraseña</label>
-                <input type="password" id="login-password" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="Contraseña" />
-            </div>
-        </div>
-        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-8 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">INICIA SESIÓN</button>
-        <button class="text-sm text-primary-dark font-medium text-center mt-4 w-full" onclick="navigateTo('olvido_contrasena')">¿Olvidaste tu contraseña?</button>
-        <div class="mt-8 text-center">
-            <p class="text-sm text-gray-600 mb-2">¿No tienes cuenta?</p>
-            <button class="text-primary-dark font-bold text-lg hover:text-primary-dark/80" onclick="navigateTo('registro')">Regístrate</button>
-        </div>
-    </div>
-    
-    <!-- 17. NUEVA PANTALLA: Olvido Contraseña -->
-    <div id="olvido_contrasena" class="screen p-6 pt-12">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md -mx-6 -mt-12 mb-8">
-            <button class="mr-4" onclick="navigateTo('login')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold transition duration-150 active" data-target="dashboard" onclick="showAdminScreen('dashboard', initializeDashboard)">
+                <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
             </button>
-            <h1 class="text-xl font-bold flex-grow">Recuperar Contraseña</h1>
-        </div>
-        <h2 class="text-2xl font-bold mb-4 text-center text-primary-dark">Recupera tu cuenta</h2>
-        <p class="text-center text-gray-600 mb-8">Ingresa el email asociado a tu cuenta para enviarte un enlace de recuperación.</p>
-        <div>
-            <label for="recover-email" class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
-            <input type="email" id="recover-email" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="email@ejemplo.com" />
-        </div>
-        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-10 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('login')">Enviar Enlace</button>
-    </div>
-
-    <!-- 3. Pantalla de Registro -->
-    <div id="registro" class="screen p-6 pt-12">
-        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Registro</h2>
-        <div class="space-y-6">
-            <div>
-                <label for="reg-email" class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
-                <input type="email" id="reg-email" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="ejemplo@gmail.com" />
-            </div>
-            <div>
-                <label for="reg-password" class="text-sm font-semibold text-gray-700 block mb-1">Contraseña</label>
-                <input type="password" id="reg-password" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="crea una contraseña" />
-                <span class="text-xs text-gray-500 mt-1 block">Debe tener al menos 8 caracteres</span>
-            </div>
-            <div>
-                <label for="reg-confirm" class="text-sm font-semibold text-gray-700 block mb-1">Confirmar contraseña</label>
-                <input type="password" id="reg-confirm" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" placeholder="repetir contraseña" />
-            </div>
-        </div>
-        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-10 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('registro_telefono')">Registrarse</button>
-    </div>
-
-    <!-- 4. Pantalla de Registro - Teléfono -->
-    <div id="registro_telefono" class="screen p-6 pt-12">
-        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Registro con teléf...</h2>
-        <p class="text-center text-gray-600 mb-6">Por favor confirma con un código de país e ingresa tu número de teléfono.</p>
-        <div class="flex space-x-2 mb-8">
-            <select class="w-1/4 p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark">
-                <option>+51 Perú</option>
-                <option>+52 México</option>
-            </select>
-            <input type="tel" class="w-3/4 p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark" placeholder="000 000 000" />
-        </div>
-        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-4 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('introducir_codigo')">Registrarse</button>
-    </div>
-
-    <!-- 5. Pantalla de Introducir Código -->
-    <div id="introducir_codigo" class="screen p-6 pt-12">
-        <h2 class="text-2xl font-bold mb-8 text-center text-primary-dark">Introducir código</h2>
-        <p class="text-center text-gray-600 mb-6">Hemos enviado un sms con un código de activación a tu teléfono:</p>
-        <div class="flex justify-center space-x-2 mb-8">
-            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
-            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
-            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
-            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
-            <input type="text" maxlength="1" class="w-10 h-12 text-2xl text-center border-b-2 border-primary-dark rounded-md focus:outline-none" />
-        </div>
-        <p class="text-center text-sm text-gray-500 mb-4">Código incorrecto. Ingresa de nuevo.</p>
-        <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-4 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">Verificar</button>
-        <a href="#" class="text-sm text-primary-dark font-medium text-center mt-4">Enviar código de nuevo: 00:20</a>
-    </div>
-    
-    <!-- 6. Pantalla Home -->
-    <div id="home" class="screen">
-        <!-- Header de la App (Barra superior) -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <!-- Botón para abrir el drawer -->
-            <button class="mr-4" onclick="toggleDrawer()">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                </svg>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="recolecciones" onclick="showAdminScreen('recolecciones')">
+                <i class="fas fa-truck-loading mr-3"></i> Gestión de Recolecciones
             </button>
-            <h1 class="text-xl font-bold flex-grow">Home</h1>
-            <!-- Icono de Notificaciones -->
-            <button onclick="navigateTo('notificaciones')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"></path>
-                </svg>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="usuarios" onclick="showAdminScreen('usuarios')">
+                <i class="fas fa-users mr-3"></i> Gestión de Usuarios
+            </button>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="recompensas_admin" onclick="showAdminScreen('recompensas_admin')">
+                <i class="fas fa-gift mr-3"></i> Recompensas y Puntos
+            </button>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="configuracion" onclick="showAdminScreen('configuracion')">
+                <i class="fas fa-cogs mr-3"></i> Configuración
             </button>
         </div>
 
-        <!-- Contenido Principal -->
-        <div class="p-6 flex flex-col flex-grow">
-            <div class="bg-white p-6 rounded-xl shadow-lg mb-8 text-center border-t-4 border-primary-dark">
-                <h2 class="text-xl font-semibold text-gray-800 mb-2">SINTAC</h2>
-                <p class="text-sm text-gray-600">Recolección de residuos</p>
-                <p class="text-sm text-gray-500 mt-1">¡Reciclar es un esfuerzo de todos!</p>
-            </div>
+        <div class="p-4 border-t border-primary-light/20">
+            <button onclick="cerrarSesion()" class="w-full text-left py-2 px-2 text-white font-bold hover:text-secondary-orange transition duration-150">
+                <i class="fas fa-sign-out-alt mr-3"></i> Cerrar Sesión
+            </button>
+        </div>
+    </div>
+
+    <div class="main-content flex-grow p-8 bg-gray-100 min-h-screen">
+        
+        <div id="dashboard" class="admin-screen active">
+            <h1 class="text-3xl font-bold mb-8 text-primary-dark border-b-2 border-primary-light pb-4">📊 Dashboard Principal</h1>
             
-            <!-- BOTÓN: Solicitar recolección -->
-            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold mb-4 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('solicitar_recoleccion')">Solicitar recolección</button>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-alert-critical transform hover:scale-[1.02] transition duration-200 cursor-pointer" onclick="showAdminScreen('recolecciones')">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">🔴 ALERTA IoT CRÍTICA</p>
+                    <p class="text-4xl font-bold text-alert-critical mt-1">3</p>
+                    <p class="text-xs text-gray-500 mt-1">Requiere asignación inmediata de vehículo</p>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-secondary-orange transform hover:scale-[1.02] transition duration-200 cursor-pointer" onclick="showAdminScreen('recolecciones')">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">🚛 RECOLECCIONES PENDIENTES</p>
+                    <p class="text-4xl font-bold text-secondary-orange mt-1">45</p>
+                    <p class="text-xs text-gray-500 mt-1">Total de tareas de recojo por asignar hoy</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-canjear-button">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">👥 Usuarios Registrados (Semana)</p>
+                    <p class="text-4xl font-bold text-canjear-button mt-1">120</p>
+                    <p class="text-xs text-gray-500 mt-1">Fácil de gestionar el personal</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-primary-dark">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">⭐ PUNTOS CANJEADOS (Total)</p>
+                    <p class="text-4xl font-bold text-primary-dark mt-1">8,500</p>
+                    <p class="text-xs text-gray-500 mt-1">Fácil de configurar las recompensas</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-custom mb-8">
+                <h2 class="text-xl font-bold mb-4 text-alert-critical border-b pb-2">🚨 Alertas IoT Pendientes de Acción</h2>
+                <ul class="space-y-3" id="alertaCriticalList">
+                    <li class="p-3 border border-alert-critical/30 rounded-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition duration-150" id="alert-BIN-12" data-alert-id="ALERT-001">
+                        <span class="font-semibold">BIN-12: Contenedor Lleno al 95%</span>
+                        <button onclick="openModal('asignarRecoleccion', 'ALERT-001')" class="text-alert-critical hover:underline font-bold text-sm">ASIGNAR RUTA</button>
+                    </li>
+                    <li class="p-3 border border-alert-critical/30 rounded-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition duration-150" data-alert-id="ALERT-002">
+                        <span class="font-semibold">BIN-05: Sensor de Temperatura Anormal (Fuego)</span>
+                        <button onclick="openModal('asignarRecoleccion', 'ALERT-002')" class="text-alert-critical hover:underline font-bold text-sm">ENVIAR PERSONAL</button>
+                    </li>
+                    <li class="p-3 border border-alert-low/30 rounded-lg flex justify-between items-center bg-yellow-50 hover:bg-yellow-100 transition duration-150" data-alert-id="ALERT-003">
+                        <span class="font-semibold text-alert-low">BIN-20: Nivel de Batería Bajo (10%)</span>
+                        <button onclick="openModal('verDetalleRecoleccion', 'ALERT-003')" class="text-alert-low hover:underline font-bold text-sm">VER DETALLE</button>
+                    </li>
+                </ul>
+            </div>
+
+
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">Recolecciones por Mes (Kg) - Histórico</h2>
+                <div class="h-96 w-full flex items-center justify-center bg-gray-50 rounded-lg p-4">
+                    <canvas id="kgRecicladosChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="recolecciones" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">🗑️ Gestión de Recolecciones y Rutas</h1>
             
-            <button class="bg-primary-dark/80 text-white p-4 rounded-xl font-semibold mb-8 shadow-custom transition duration-200 hover:bg-primary-dark/70" onclick="navigateTo('historial')">Ver historial de recojo</button>
-
-            <div class="bg-gray-100 p-4 rounded-xl text-center flex-grow flex flex-col justify-center">
-                <p class="text-sm text-gray-600 mb-4">¿Quieres canjear puntos?</p>
-                <button class="bg-secondary-orange text-white p-3 rounded-xl font-semibold shadow-custom transition duration-200 hover:bg-secondary-orange/90" onclick="navigateTo('recompensas')">Ver Recompensas</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 7. Pantalla de Perfil (perfil) -->
-    <div id="perfil" class="screen">
-        <!-- Header con botón de regreso y EDITAR -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('home')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Perfil</h1>
-            <!-- BOTÓN CONECTADO: Editar Perfil -->
-            <button class="edit-icon" onclick="navigateTo('editar_perfil')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                </svg>
-            </button>
-        </div>
-        <!-- Contenido de Perfil -->
-        <div class="p-6 space-y-4">
-            <div class="flex items-center space-x-4 border-b pb-4">
-                <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-lg font-bold text-gray-600">FM</div>
-                <div>
-                    <p class="font-bold text-lg">Fausto Medina</p>
-                    <p class="text-sm text-gray-500">Usuario</p>
-                </div>
-            </div>
-            <!-- Datos -->
-            <div class="space-y-4">
-                <div class="flex justify-between items-center py-2 border-b">
-                    <span class="font-semibold text-gray-700">Dirección</span>
-                    <span class="text-gray-500">Calle los avellanos 123</span>
-                </div>
-                <div class="flex justify-between items-center py-2 border-b">
-                    <span class="font-semibold text-gray-700">Horario</span>
-                    <span class="text-gray-500">09:00</span>
-                </div>
-                <div class="flex justify-between items-center py-2 border-b">
-                    <span class="font-semibold text-gray-700">Email</span>
-                    <span class="text-gray-500">ejemplo@gmail.com</span>
-                </div>
-                <div class="flex justify-between items-center py-2 border-b">
-                    <span class="font-semibold text-gray-700">Contraseña</span>
-                    <span class="text-gray-500">************</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 18. NUEVA PANTALLA: Editar Perfil -->
-    <div id="editar_perfil" class="screen">
-        <!-- Header con botón de regreso -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('perfil')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Editar Perfil</h1>
-        </div>
-        <div class="p-6 space-y-6 overflow-y-auto flex-grow">
-            <!-- Campos -->
-            <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-1">Nombre</label>
-                <input type="text" value="Fausto Medina" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
-            </div>
-            <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-1">Dirección</label>
-                <input type="text" value="Calle los avellanos 123" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
-            </div>
-            <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-1">Horario</label>
-                <input type="text" value="09:00" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
-            </div>
-            <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-1">Email</label>
-                <input type="email" value="ejemplo@gmail.com" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
-            </div>
-            <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-1">Nueva Contraseña</label>
-                <input type="password" placeholder="Ingresa nueva contraseña" class="w-full p-3 border-b border-primary-dark focus:border-primary-dark/70 rounded-md focus:outline-none" />
-            </div>
-        </div>
-        <!-- Botón Guardar -->
-        <div class="p-6 pt-0">
-            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('perfil')">Guardar Cambios</button>
-        </div>
-    </div>
-    
-    <!-- 8. Pantalla de Historial -->
-    <div id="historial" class="screen">
-        <!-- Header con botón de regreso -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('home')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Historial</h1>
-        </div>
-        <!-- Contenido de Historial -->
-        <div class="p-6 flex flex-col flex-grow">
-            <div class="space-y-4 flex-grow">
-                <div class="bg-gray-50 p-4 rounded-lg shadow-sm border-l-4 border-primary-dark">
-                    <p class="font-bold text-gray-800">22/08/2025</p>
-                    <p class="text-sm text-gray-600">Horario: 10:20</p>
-                    <p class="text-xs text-gray-500">Dirección: Calle los avellanos 123</p>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg shadow-sm border-l-4 border-primary-dark">
-                    <p class="font-bold text-gray-800">06/06/2025</p>
-                    <p class="text-sm text-gray-600">Horario: 09:45</p>
-                    <p class="text-xs text-gray-500">Dirección: Esmeralda 30A</p>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg shadow-sm border-l-4 border-primary-dark">
-                    <p class="font-bold text-gray-800">15/01/2025</p>
-                    <p class="text-sm text-gray-600">Horario: 11:30</p>
-                    <p class="text-xs text-gray-500">Dirección: Rodriguer Camen 1568</p>
-                </div>
-            </div>
-            <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold mt-6 shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('mapa_recoleccion')">Ver Mapa</button>
-        </div>
-    </div>
-    
-    <!-- 9. Pantalla de Notificaciones -->
-    <div id="notificaciones" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('home')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Notificaciones</h1>
-        </div>
-        <!-- Contenido -->
-        <div class="p-6">
-            <div class="flex justify-between items-center py-4 border-b">
-                <span class="font-semibold text-gray-700">Permitir notificaciones</span>
-                <div class="w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer">
-                    <div class="toggle-dot w-4 h-4 bg-white rounded-full shadow-md transform translate-x-0 transition duration-300"></div>
-                </div>
-            </div>
-            <div class="mt-4 space-y-4">
-                <div class="bg-primary-light/50 p-3 rounded-lg border-l-4 border-primary-dark">
-                    <p class="font-semibold text-gray-800">Recolección programada</p>
-                    <p class="text-sm text-gray-600">Tu recolección del día 22/08 ha sido confirmada.</p>
-                </div>
-                <div class="bg-primary-light/50 p-3 rounded-lg border-l-4 border-primary-dark">
-                    <p class="font-semibold text-gray-800">¡Nuevas recompensas!</p>
-                    <p class="text-sm text-gray-600">Tenemos nuevos cupones para ti.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 10. Pantalla de Preguntas Frecuentes -->
-    <div id="faq" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('home')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Preguntas frecuentes</h1>
-        </div>
-        <div class="p-6 space-y-4">
-            <!-- Preguntas -->
-            <div class="border rounded-lg overflow-hidden shadow-sm">
-                <button class="w-full text-left p-4 bg-gray-50 font-semibold text-gray-700">¿Cómo solicito una recolección?</button>
-                <div class="p-4 text-sm text-gray-600 border-t">
-                    <p>Puedes solicitar una recolección desde la pantalla de Inicio, usando el botón "Solicitar recolección".</p>
-                </div>
-            </div>
-            <div class="border rounded-lg overflow-hidden shadow-sm">
-                <button class="w-full text-left p-4 bg-gray-50 font-semibold text-gray-700">¿Qué tipo de residuos aceptan?</button>
-                <div class="p-4 text-sm text-gray-600 border-t">
-                    <p>Aceptamos papel, cartón, plástico, vidrio y metales. Deben estar limpios y separados.</p>
-                </div>
-            </div>
-            <div class="border rounded-lg overflow-hidden shadow-sm">
-                <button class="w-full text-left p-4 bg-gray-50 font-semibold text-gray-700">¿Cómo canjeo mis puntos?</button>
-                <div class="p-4 text-sm text-gray-600 border-t">
-                    <p>Visita la sección "Ver Recompensas" en el Home para ver los cupones disponibles y canjear tus puntos acumulados.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 11. Publicidad -->
-    <div id="publicidad" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('home')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Publicidad Asociados</h1>
-        </div>
-        <div class="p-6">
-            <div class="bg-yellow-100 p-6 rounded-xl border-2 border-yellow-400 text-center">
-                <h3 class="font-bold text-lg text-yellow-800 mb-2">¡Oferta Especial!</h3>
-                <p class="text-sm text-yellow-700">Recibe un 15% de descuento en tu próxima compra de productos ecológicos en la tienda "Green Life".</p>
-                <button class="mt-4 bg-yellow-500 text-white p-2 rounded-lg font-semibold text-sm">Ver Cupón</button>
-            </div>
-            <div class="mt-6 bg-blue-100 p-6 rounded-xl border-2 border-blue-400 text-center">
-                <h3 class="font-bold text-lg text-blue-800 mb-2">¡Nuevo Socio!</h3>
-                <p class="text-sm text-blue-700">Te presentamos a nuestro nuevo asociado, la Fundación "Bosques Vivos".</p>
-                <button class="mt-4 bg-blue-500 text-white p-2 rounded-lg font-semibold text-sm">Visitar</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 12. Recompensas -->
-    <div id="recompensas" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('home')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow uppercase">Recompensas</h1>
-        </div>
-        <div class="p-6 overflow-y-auto flex-grow">
-            <!-- Tus Recompensas -->
-            <div class="mb-8 p-4 border border-gray-100 rounded-xl shadow-md">
-                <h2 class="text-sm font-bold text-gray-800 mb-1 tracking-wider uppercase">Tus Recompensas</h2>
-                <p class="text-xs text-gray-600 mb-4">Canjea tus puntos por beneficio</p>
-                <p class="text-lg font-semibold text-gray-800 mb-2 flex items-center">
-                    120 / 200 puntos <span class="text-yellow-500 text-2xl ml-2">★</span>
-                </p>
-                <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-primary-dark transition-all duration-500 ease-out" style="width: 60%;"></div>
-                </div>
-            </div>
-            <!-- Catálogo de recompensas -->
-            <h2 class="text-sm font-bold text-gray-800 mb-4 tracking-wider uppercase">Catálogo de recompensas</h2>
-            <div class="space-y-4">
-                <!-- Recompensa 1 -->
-                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
-                    <p class="font-semibold text-gray-700">COMBO KFC</p>
-                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
-                </div>
-                <!-- Recompensa 2 -->
-                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
-                    <p class="font-semibold text-gray-700">COMBO CINE</p>
-                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
-                </div>
-                <!-- Recompensa 3 -->
-                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
-                    <p class="font-semibold text-gray-700">COMBO ROPA</p>
-                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
-                </div>
-                <!-- Recompensa 4 -->
-                <div class="border border-gray-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
-                    <p class="font-semibold text-gray-700">COMBO SORPRESA</p>
-                    <button class="bg-canjear-button text-white py-2 px-4 rounded-xl font-semibold text-sm hover:bg-canjear-button/90 transition duration-200" onclick="navigateTo('canjear_confirmacion')">CANJEAR</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 13. Canjear Confirmacion -->
-    <div id="canjear_confirmacion" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('recompensas')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow uppercase">Canjear Recompensa</h1>
-        </div>
-        <div class="p-6 flex flex-col items-center text-center flex-grow justify-center">
-             <!-- Icono de Éxito -->
-            <div class="w-24 h-24 bg-primary-dark/80 rounded-full flex items-center justify-center mb-6">
-                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-4">¡Canje Exitoso!</h2>
-            <p class="text-gray-700 text-lg mb-8">Has canjeado el COMBO KFC por 80 puntos.</p>
-            <p class="text-sm text-gray-500 mb-10">Revisa tu correo electrónico para obtener tu cupón.</p>
-            <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold w-full max-w-xs shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('recompensas')">Volver a Recompensas</button>
-        </div>
-    </div>
-    
-    <!-- 14. Solicitar Recolección -->
-    <div id="solicitar_recoleccion" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('home')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Solicitar recolección</h1>
-        </div>
-        <!-- Contenido -->
-        <div class="p-6 overflow-y-auto flex-grow">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">Completa la siguiente información</h2>
-            <p class="text-sm text-gray-600 mb-6">
-                ¿Seleccione el distrito donde se encuentra el contenedor lleno?
-                <br>
-                <span class="text-xs text-gray-500">Ten en cuenta que el distrito es referencial</span>
-            </p>
-            <!-- Selector Distrito -->
-            <select class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark mb-6 text-gray-700">
-                <option selected disabled>Seleccione el distrito</option>
-                <option>CAYMA</option>
-                <option>YANAHUARA</option>
-                <option>SOCABAYA</option>
-                <option>CERRO COLORADO</option>
-            </select>
-            <!-- Seccion mapa -->
-            <div class="mb-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-3">MAPA</h3>
-                <button class="w-full flex justify-between items-center p-4 border border-gray-300 rounded-xl shadow-sm hover:bg-gray-50 transition duration-150" onclick="navigateTo('mapa_recoleccion')">
-                    <span class="text-gray-700">MAPA</span>
-                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            <div class="flex justify-between items-center mb-4">
+                 <button onclick="openModal('crearRuta')" class="px-6 py-3 bg-secondary-orange text-white rounded-lg font-semibold shadow-md hover:bg-secondary-orange/90 transition duration-150">
+                    <i class="fas fa-route mr-2"></i> Crear Nueva Ruta Óptima
                 </button>
+                
+                <select class="p-2 border border-gray-300 rounded-md focus:ring-primary-dark focus:border-primary-dark" onchange="filterRecolecciones(this.value)">
+                    <option value="todos">Mostrar Todos</option>
+                    <option value="urgentes">Mostrar Solo Urgentes</option>
+                    <option value="asignados">Mostrar Asignados</option>
+                </select>
             </div>
-            <!-- Sección PROBLEMA -->
-            <div class="mb-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-3">SELECCIONE PROBLEMA</h3>
-                <button class="w-full flex justify-between items-center p-4 border border-gray-300 rounded-xl shadow-sm hover:bg-gray-50 transition duration-150" onclick="navigateTo('seleccionar_problema')">
-                    <span class="text-gray-700">SELECCIONE PROBLEMA</span>
-                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+
+
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">Solicitudes Pendientes (Alertas y Manuales)</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-primary-dark text-white">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">USUARIO / SENSOR</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">FECHA RECOJO</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">TIPO DE RESIDUOS</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ESTADO</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="tablaRecolecciones">
+                            <tr data-estado="urgentes">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">ALERT-001</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-bold">SENSOR BIN-12 (LLENO 95%)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ASIGNAR AHORA</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Plástico</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-600/20 text-red-600">URGENTE</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('asignarRecoleccion', 'ALERT-001')" class="text-primary-dark hover:text-primary-dark/80 font-bold">Asignar</button>
+                                    <button onclick="openModal('verDetalleRecoleccion', 'ALERT-001')" class="text-blue-600 hover:text-blue-800">Ver Detalle</button>
+                                </td>
+                            </tr>
+                            <tr data-estado="asignados">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">REC-002</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Ana Pérez</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2025-12-02 (15:00)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Vidrio, Papel</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-dark/20 text-primary-dark">Asignado</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('asignarRecoleccion', 'REC-002')" class="text-primary-dark hover:text-primary-dark/80 font-bold">Reasignar</button>
+                                    <button onclick="openModal('verDetalleRecoleccion', 'REC-002')" class="text-blue-600 hover:text-blue-800">Ver Detalle</button>
+                                </td>
+                            </tr>
+                            <tr data-estado="urgentes">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-yellow-600">ALERT-003</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-bold">SENSOR BIN-20 (Batería 10%)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ASIGNAR HOY</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Mantenimiento</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-600/20 text-yellow-600">MANTENIMIENTO</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('asignarRecoleccion', 'ALERT-003')" class="text-primary-dark hover:text-primary-dark/80 font-bold">Asignar</button>
+                                    <button onclick="openModal('verDetalleRecoleccion', 'ALERT-003')" class="text-blue-600 hover:text-blue-800">Ver Detalle</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="usuarios" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">👥 Gestión de Usuarios</h1>
+            
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">Lista de Usuarios Registrados</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-primary-dark text-white">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">NOMBRE</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">EMAIL</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">PUNTOS</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">101</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Fausto Medina</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">fausto.m@mail.com</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-primary-dark font-bold">120</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('editarUsuario', 'Fausto Medina')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                                    <button onclick="openModal('bloquearUsuario', 'Fausto Medina')" class="text-red-600 hover:text-red-800">Bloquear</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">102</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Ana Pérez</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ana.p@mail.com</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-primary-dark font-bold">50</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('editarUsuario', 'Ana Pérez')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                                    <button onclick="openModal('bloquearUsuario', 'Ana Pérez')" class="text-red-600 hover:text-red-800">Bloquear</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="recompensas_admin" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">🎁 Recompensas y Puntos</h1>
+            
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">Catálogo de Recompensas</h2>
+                
+                <button onclick="openModal('anadirRecompensa')" class="mb-6 px-6 py-3 bg-secondary-orange text-white rounded-lg font-semibold shadow-md hover:bg-secondary-orange/90 transition duration-150">
+                    <i class="fas fa-plus mr-2"></i> Añadir Nueva Recompensa
                 </button>
-            </div>
-        </div>
-        <!-- Botón confirmar -->
-        <div class="p-6 pt-0">
-            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('recoleccion_confirmada')">CONFIRMAR SOLICITUD</button>
-        </div>
-    </div>
-    
-    <!-- 20. Seleccionar Problema -->
-    <div id="seleccionar_problema" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('solicitar_recoleccion')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Seleccionar Problema</h1>
-        </div>
-        <div class="p-6 space-y-4 flex-grow">
-            <p class="text-sm text-gray-600 mb-4">Por favor, elige el tipo de problema para reportar:</p>
-            <!-- Opciones -->
-            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
-                <p class="font-semibold text-gray-800">Contenedor dañado o roto</p>
-            </div>
-            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
-                <p class="font-semibold text-gray-800">Ubicación incorrecta o bloqueada</p>
-            </div>
-            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
-                <p class="font-semibold text-gray-800">Cambio de tipo de residuo</p>
-            </div>
-            <div class="problem-option border border-gray-200 rounded-xl p-4 shadow-sm hover:bg-primary-light/30 transition duration-150 cursor-pointer" onclick="selectProblem(this)">
-                <p class="font-semibold text-gray-800">Otro (Describe en el detalle)</p>
-            </div>
-            <textarea placeholder="Detalles adicionales..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark mt-4 h-24"></textarea>
-        </div>
-        <!-- Confirmar botón -->
-        <div class="p-6 pt-0">
-            <button class="bg-primary-dark text-white p-4 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('solicitar_recoleccion')">Confirmar</button>
-        </div>
-    </div>
-    
-    <!-- 14. Recolección Confirmada -->
-    <div id="recoleccion_confirmada" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('solicitar_recoleccion')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Recolección confirmada</h1>
-        </div>
-        <!-- Contenido -->
-        <div class="p-6 flex flex-col items-center text-center flex-grow justify-center">
-            <!-- Icono -->
-            <div class="w-32 h-32 bg-primary-light/80 rounded-full flex items-center justify-center mb-6">
-                <svg class="w-16 h-16 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0020.57 9m-1.554-1.554L15 5m4.57 4h-4.57m3.305 4H10m4.615 4h2.527M12 20.57A8.001 8.001 0 0015 20.57M4 20.57A8.001 8.001 0 0012 20.57"></path>
-                </svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-4">¡Estamos en camino!</h2>
-            <p class="text-gray-700 text-lg mb-6">Hora estimada: 14:15 hs</p>
-            <!-- Barra progreso -->
-            <div class="w-full max-w-xs mb-8">
-                <p class="text-sm text-gray-600 mb-2">Preparando recolección</p>
-                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-primary-dark transition-all duration-500 ease-out" style="width: 75%;"></div>
+
+                <div class="space-y-4">
+                    <div class="p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:shadow-sm">
+                        <div>
+                            <p class="font-bold text-lg text-primary-dark">COMBO KFC</p>
+                            <p class="text-sm text-gray-600">Costo: <span class="font-semibold text-secondary-orange">200 Puntos</span></p>
+                        </div>
+                        <div class="space-x-3 text-sm font-medium">
+                            <button onclick="openModal('editarRecompensa', 'COMBO KFC')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                            <button onclick="openModal('eliminarRecompensa', 'COMBO KFC')" class="text-red-600 hover:text-red-800">Eliminar</button>
+                        </div>
+                    </div>
+                    <div class="p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:shadow-sm">
+                        <div>
+                            <p class="font-bold text-lg text-primary-dark">COMBO CINE</p>
+                            <p class="text-sm text-gray-600">Costo: <span class="font-semibold text-secondary-orange">150 Puntos</span></p>
+                        </div>
+                        <div class="space-x-3 text-sm font-medium">
+                            <button onclick="openModal('editarRecompensa', 'COMBO CINE')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                            <button onclick="openModal('eliminarRecompensa', 'COMBO CINE')" class="text-red-600 hover:text-red-800">Eliminar</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <!-- Acciones -->
-            <div class="w-full max-w-xs space-y-4">
-                <button class="bg-primary-dark text-white p-3 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">Volver a inicio</button>
-                <button class="bg-white text-primary-dark border border-primary-dark p-3 rounded-xl font-semibold w-full shadow-sm transition duration-200 hover:bg-gray-100" onclick="navigateTo('cancelar_confirmacion')">Cancelar recolección</button>
-            </div>
         </div>
-    </div>
-    
-    <!-- 21. Cancelar Confirmacion -->
-    <div id="cancelar_confirmacion" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('recoleccion_confirmada')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Cancelar Recolección</h1>
-        </div>
-        <div class="p-6 flex flex-col items-center text-center flex-grow justify-center">
-            <!-- Icono advertencia -->
-            <div class="w-24 h-24 bg-secondary-orange/80 rounded-full flex items-center justify-center mb-6">
-                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.772-1.333-2.694-1.333-3.464 0L3.3 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-4">¿Estás seguro?</h2>
-            <p class="text-gray-700 text-lg mb-8">Si cancelas ahora, perderás tu lugar en la cola de recolección.</p>
-            <!-- Botones -->
-            <div class="w-full max-w-xs space-y-4">
-                <button class="bg-secondary-orange text-white p-3 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-secondary-orange/90" onclick="navigateTo('home')">Sí, Cancelar</button>
-                <button class="bg-white text-primary-dark border border-primary-dark p-3 rounded-xl font-semibold w-full shadow-sm transition duration-200 hover:bg-gray-100" onclick="navigateTo('recoleccion_confirmada')">No, Volver</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 22. Mapa en vivo -->
-    <div id="mapa_recoleccion" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('solicitar_recoleccion')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Solicitar recolección</h1>
-        </div>
-        <!-- Área del mapa -->
-        <div class="map-placeholder flex-grow relative" id="map" style="height: 600px;">
-            <!-- Botón fijo en el mapa -->
-            <button class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-primary-dark text-white p-3 rounded-xl font-semibold shadow-custom transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('detalle_recoleccion')">
-                Detalle
-            </button>
-        </div>
-    </div>
-    
-    <!-- 23. Detalle de Recolección -->
-    <div id="detalle_recoleccion" class="screen">
-        <!-- Header -->
-        <div class="bg-primary-dark text-white p-4 flex items-center shadow-md">
-            <button class="mr-4" onclick="navigateTo('mapa_recoleccion')">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-            </button>
-            <h1 class="text-xl font-bold flex-grow">Detalle Recolección</h1>
-        </div>
-        <div class="p-6 space-y-6">
-            <!-- Información -->
-            <div class="bg-primary-light/50 p-4 rounded-xl text-center">
-                <p class="text-lg font-bold text-primary-dark">¡Recolector en camino!</p>
-                <p class="text-sm text-gray-700">Llegada estimada: 14:15 hs</p>
-            </div>
-            <div class="space-y-3">
-                <h3 class="text-lg font-bold text-gray-800 border-b pb-1">Información del Servicio</h3>
-                <div class="flex justify-between text-gray-700">
-                    <span class="font-semibold">Dirección de Recolección:</span>
-                    <span>Calle los avellanos 123</span>
+
+        <div id="configuracion" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">⚙️ Configuración del Sistema</h1>
+            
+            <div class="bg-white p-6 rounded-xl shadow-custom space-y-6">
+                
+                <div class="border-b pb-4">
+                    <h2 class="text-xl font-bold mb-3 text-primary-dark">Tarifas de Puntos por Material</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Plástico (Puntos/Kg)</label>
+                            <input type="number" value="3" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Papel/Cartón (Puntos/Kg)</label>
+                            <input type="number" value="2" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Vidrio/Metal (Puntos/Kg)</label>
+                            <input type="number" value="1" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between text-gray-700">
-                    <span class="font-semibold">Distrito:</span>
-                    <span>CAYMA</span>
+
+                <div class="border-b pb-4">
+                    <h2 class="text-xl font-bold mb-3 text-primary-dark">Gestión de Flota y Rutas</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Número Total de Unidades</label>
+                            <input type="number" value="5" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Radio de Cobertura (Km)</label>
+                            <input type="number" value="20" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <button class="col-span-1 md:col-span-2 bg-canjear-button text-white px-4 py-2 rounded-lg font-semibold hover:bg-canjear-button/90 transition duration-150">
+                            Administrar Rutas y Zonas
+                        </button>
+                    </div>
                 </div>
-                <div class="flex justify-between text-gray-700">
-                    <span class="font-semibold">Estado:</span>
-                    <span class="text-primary-dark font-bold">En Progreso</span>
-                </div>
-                <div class="flex justify-between text-gray-700">
-                    <span class="font-semibold">Problemas Reportados:</span>
-                    <span>Ninguno</span>
+
+                <div class="pt-4 flex justify-end">
+                    <button class="bg-primary-dark text-white px-6 py-3 rounded-lg font-bold shadow-md hover:bg-primary-dark/90 transition duration-150">
+                        Guardar Cambios de Configuración
+                    </button>
                 </div>
             </div>
-            <button class="bg-secondary-orange text-white p-3 rounded-xl font-semibold w-full shadow-custom transition duration-200 hover:bg-secondary-orange/90" onclick="navigateTo('mapa_recoleccion')">Ver Mapa en vivo</button>
         </div>
     </div>
-    
-    <!-- 16. Verificación Teléfono -->
-    <div id="verificacion_telefono" class="screen p-6 flex items-center justify-center">
-        <div class="text-center">
-            <p class="text-xl font-bold text-primary-dark mb-4">Verificación de Teléfono</p>
-            <p class="text-gray-600">Esta pantalla simula el flujo de verificación. Regresa al Home para continuar.</p>
-            <button class="mt-8 bg-primary-dark text-white p-3 rounded-xl font-semibold transition duration-200 hover:bg-primary-dark/90" onclick="navigateTo('home')">Ir a Home</button>
+
+    <div id="mainModal" class="modal-overlay">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-custom" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 id="modalTitle" class="text-2xl font-bold text-primary-dark">Título del Modal</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            <div id="modalBody" class="text-gray-700">
+                </div>
+            <div id="modalFooter" class="pt-4 flex justify-end space-x-3">
+                </div>
         </div>
     </div>
-</div>
 
-<!-- Scripts -->
-<script>
-    // Variables
-    let currentScreenId = 'login';
-    const drawer = document.getElementById('drawer');
+    <script>
+        let chartInstance = null; // Variable para almacenar la instancia del gráfico
+        let alertSimulatorInterval = null; // Variable global para mantener el intervalo de simulación
+        let alertCounter = 3; // Mantiene un contador para generar ID únicos y simular la llegada de nuevas alertas
 
-    // Función de navegación
-    function navigateTo(targetId) {
-        if (drawer.classList.contains('open')) {
-            toggleDrawer();
-            setTimeout(() => { _transitionScreen(targetId); }, 300);
-        } else {
-            _transitionScreen(targetId);
-        }
-    }
-
-    function _transitionScreen(targetId) {
-        const currentScreen = document.getElementById(currentScreenId);
-        const targetScreen = document.getElementById(targetId);
-        if (!targetScreen) { console.error(`Pantalla ${targetId} no existe.`); return; }
-
-        if (currentScreen) {
-            currentScreen.classList.remove('active');
-            currentScreen.classList.add('inactive');
-        }
-        targetScreen.classList.remove('inactive');
-        targetScreen.classList.add('active');
-        currentScreenId = targetId;
-
-        setTimeout(() => {
-            if (currentScreen && currentScreen.id !== currentScreenId) {
-                currentScreen.classList.remove('inactive');
-            }
-        }, 300);
-    }
-
-    function toggleDrawer() {
-        drawer.classList.toggle('open');
-    }
-
-    function selectProblem(element) {
-        document.querySelectorAll('.problem-option').forEach(opt => opt.classList.remove('selected-problem'));
-        element.classList.add('selected-problem');
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        // Inicializar pantallas
-        document.querySelectorAll('.screen').forEach(s => {
-            s.classList.toggle('active', s.id === currentScreenId);
-            s.classList.toggle('inactive', s.id !== currentScreenId);
-        });
-        // Asignar eventos a botones del drawer
-        document.querySelectorAll('.drawer-nav').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = btn.getAttribute('data-target');
-                navigateTo(target);
+        // 1. Función para cambiar de pantalla
+        function showAdminScreen(screenId, callback = null) {
+            document.querySelectorAll('.admin-screen').forEach(screen => {
+                screen.classList.remove('active');
             });
-        });
-    });
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
 
-    // ==========================
-    // Código mapa
-    // ==========================
-    var arequipaCentro = [-16.409047, -71.537451];
+            const activeScreen = document.getElementById(screenId);
+            if (activeScreen) {
+                activeScreen.classList.add('active');
+            }
 
-    var map = L.map('map').setView(arequipaCentro, 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+            const activeNavItem = document.querySelector(`.nav-item[data-target="${screenId}"]`);
+            if (activeNavItem) {
+                activeNavItem.classList.add('active');
+            }
+            
+            // Si salimos del dashboard, detener la simulación para ahorrar recursos
+            if(screenId !== 'dashboard' && alertSimulatorInterval) {
+                 clearInterval(alertSimulatorInterval);
+            }
 
-    let marker; // marcador global
 
-    const ruta = [
-        [-16.409047, -71.537451],
-        [-16.410000, -71.538000],
-        [-16.411000, -71.539000],
-        [-16.412000, -71.540000],
-        [-16.413000, -71.541000],
-    ];
-
-    let idx = 0;
-
-    function moverGPS(lat, lon) {
-        if (!marker) {
-            marker = L.marker([lat, lon]).addTo(map);
-        } else {
-            marker.setLatLng([lat, lon]);
+            if (callback && typeof callback === 'function') {
+                callback();
+            }
         }
-        map.setView([lat, lon], 13);
-    }
+        
+        // 2. Función para inicializar el gráfico (dinámico)
+        function initializeReciclajeChart() {
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
 
-    setInterval(() => {
-        moverGPS(ruta[idx][0], ruta[idx][1]);
-        idx = (idx + 1) % ruta.length;
-    }, 2000);
-</script>
+            const ctx = document.getElementById('kgRecicladosChart');
+            
+            const data = {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                datasets: [{
+                    label: 'Kg Reciclados',
+                    data: [1200, 1500, 1300, 1800, 2000, 1700, 2200, 2500, 2300, 2700, 2900, 3100],
+                    backgroundColor: '#2E8B57', // primary-dark
+                    borderColor: '#2E8B57',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                }]
+            };
+
+            const config = {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Kilogramos (Kg)'
+                            }
+                        }
+                    }
+                }
+            };
+            
+            chartInstance = new Chart(ctx, config);
+        }
+
+        // 3. Función para filtrar recolecciones
+        function filterRecolecciones(filtro) {
+            const filas = document.getElementById('tablaRecolecciones').getElementsByTagName('tr');
+            
+            for (let i = 0; i < filas.length; i++) {
+                const estado = filas[i].getAttribute('data-estado');
+                if (filtro === 'todos' || estado === filtro) {
+                    filas[i].style.display = ''; // Mostrar
+                } else {
+                    filas[i].style.display = 'none'; // Ocultar
+                }
+            }
+        }
+
+
+        // 4. Funciones de Modal
+        function openModal(actionType, data = null) {
+            const modal = document.getElementById('mainModal');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            const footer = document.getElementById('modalFooter');
+
+            let content = '';
+            let footerContent = '';
+            
+            switch (actionType) {
+                case 'asignarRecoleccion':
+                    title.textContent = `Asignar Recolección ${data}`;
+                    content = `
+                        <p class="mb-4">Seleccione la unidad de recojo y la hora estimada para la solicitud **${data}**.</p>
+                        <div class="mt-4 space-y-3">
+                            <label class="block text-sm font-medium text-gray-700">Unidad de Flota</label>
+                            <select class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark">
+                                <option>Seleccionar...</option>
+                                <option>Unidad Alfa (Disponible)</option>
+                                <option>Unidad Beta (Disponible)</option>
+                                <option>Unidad Gamma (En Ruta)</option>
+                            </select>
+                            <label class="block text-sm font-medium text-gray-700">Hora Estimada</label>
+                            <input type="time" value="11:00" class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark"/>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Recolección ${data} Asignada!'); markAlertAssigned('${data}'); closeModal();" class="bg-primary-dark text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark/90">Confirmar Asignación</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                 case 'crearRuta':
+                    title.textContent = `Crear Nueva Ruta de Recojo`;
+                    content = `
+                        <p class="mb-4">El sistema utiliza la inteligencia artificial para optimizar las rutas automáticamente. Seleccione los parámetros.</p>
+                        <div class="mt-4 space-y-3">
+                            <label class="block text-sm font-medium text-gray-700">Seleccionar Zona de Enfoque</label>
+                            <select class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark">
+                                <option>Zona A - Cayma (Prioridad Alta)</option>
+                                <option>Zona B - Miraflores</option>
+                                <option>Todas las zonas</option>
+                            </select>
+                            <label class="block text-sm font-medium text-gray-700">Incluir alertas IoT (Críticas)</label>
+                            <input type="checkbox" checked class="h-4 w-4 text-primary-dark border-gray-300 rounded" />
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Ruta Óptima Creada y Asignada!'); closeModal();" class="bg-secondary-orange text-white px-4 py-2 rounded-lg font-semibold hover:bg-secondary-orange/90">Generar y Asignar Ruta</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'verDetalleRecoleccion':
+                    title.textContent = `Detalle de Recolección ${data}`;
+                    content = `
+                        <p class="font-bold mb-2">Información de la Solicitud ${data}</p>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong>Usuario:</strong> Fausto Medina / SENSOR BIN-12</li>
+                            <li><strong>Dirección:</strong> Av. La Paz 123, Cayma</li>
+                            <li><strong>Material:</strong> 10 Kg Plástico, 5 Kg Cartón</li>
+                            <li><strong>Estado Actual:</strong> Pendiente / URGENTE</li>
+                            <li><strong>Fecha Solicitud:</strong> 2025-11-30</li>
+                        </ul>
+                        <div class="mt-4">
+                            <button class="bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600">Ver Ubicación en Mapa</button>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cerrar</button>
+                    `;
+                    break;
+                case 'editarUsuario':
+                    title.textContent = `Editar Usuario: ${data}`;
+                    content = `
+                        <p class="mb-4">Modificando la información de **${data}**.</p>
+                        <div class="mt-4 space-y-3">
+                            <label class="block text-sm font-medium text-gray-700">Puntos Actuales</label>
+                            <input type="number" value="120" class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark"/>
+                            <label class="block text-sm font-medium text-gray-700">Rol</label>
+                            <select class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark">
+                                <option>Usuario Estándar</option>
+                                <option>Usuario VIP</option>
+                                <option>Administrador</option>
+                            </select>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Usuario ${data} Editado!'); closeModal();" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">Guardar Cambios</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'bloquearUsuario':
+                    title.textContent = `Confirmar Bloqueo de Usuario`;
+                    content = `<p class="text-red-600">¿Está seguro que desea bloquear al usuario **${data}**? Esto impedirá que inicie sesión y solicite recolecciones.</p>`;
+                    footerContent = `
+                        <button onclick="alert('Usuario ${data} Bloqueado!'); closeModal();" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Bloquear</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'anadirRecompensa':
+                    title.textContent = `Crear Nueva Recompensa`;
+                    content = `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nombre de la Recompensa</label>
+                                <input type="text" placeholder="Ej: Vaso Starbucks, Descuento 20%" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Costo en Puntos</label>
+                                <input type="number" placeholder="Ej: 150" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Descripción Breve</label>
+                                <textarea rows="3" placeholder="Detalles de la recompensa..." class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange"></textarea>
+                            </div>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Nueva Recompensa Creada!'); closeModal();" class="bg-secondary-orange text-white px-4 py-2 rounded-lg font-semibold hover:bg-secondary-orange/90">Crear Recompensa</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'editarRecompensa':
+                    title.textContent = `Editar Recompensa: ${data}`;
+                    content = `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nombre de la Recompensa</label>
+                                <input type="text" value="${data}" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Costo en Puntos</label>
+                                <input type="number" value="200" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Recompensa ${data} Editada!'); closeModal();" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">Guardar Cambios</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'eliminarRecompensa':
+                    title.textContent = `Eliminar Recompensa`;
+                    content = `<p class="text-red-600">¿Está seguro que desea eliminar la recompensa **${data}** del catálogo?</p>`;
+                    footerContent = `
+                        <button onclick="alert('Recompensa ${data} Eliminada!'); closeModal();" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Eliminar</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                default:
+                    title.textContent = 'Acción Desconocida';
+                    content = '<p>No se pudo cargar el contenido de esta acción.</p>';
+                    footerContent = `<button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cerrar</button>`;
+            }
+
+            body.innerHTML = content;
+            footer.innerHTML = footerContent;
+            modal.style.display = 'flex';
+        }
+
+        // FUNCIÓN closeModal CORREGIDA
+        function closeModal() {
+            document.getElementById('mainModal').style.display = 'none';
+        }
+
+        // Simula que la alerta se ha asignado y ya no es un problema crítico sin resolver
+        function markAlertAssigned(alertId) {
+             const rowToUpdate = document.querySelector(`li[data-alert-id="${alertId}"]`);
+             if (rowToUpdate) {
+                // Simular que la alerta ahora es una tarea asignada, no una alerta pendiente
+                rowToUpdate.innerHTML = `
+                    <span class="font-semibold text-primary-dark">${rowToUpdate.textContent.split(':')[0]}: Asignada (Unidad Beta)</span>
+                    <button onclick="markAlertResolved('${alertId}')" class="text-green-600 hover:underline font-bold text-sm ml-auto">MARCAR RESUELTA</button>
+                `;
+                // También actualizamos el contador principal en el dashboard
+                updateAlertCount(-1); 
+            }
+        }
+
+
+        // 5. Simula la llegada de nuevas alertas IoT (o la actualización de existentes).
+        function simulateIoTAlert() {
+            const tablaAlertas = document.getElementById('alertaCriticalList');
+            if (!tablaAlertas) return; // Asegura que solo se ejecute si está en el dashboard
+
+            // 1. Simulación: Generar una NUEVA alerta crítica
+            alertCounter++;
+            const newAlertID = `ALERT-00${alertCounter}`;
+            // Genera un nombre de BIN aleatorio para mayor realismo
+            const newBinName = `BIN-${Math.floor(Math.random() * 90) + 10}`; 
+            const fillLevel = Math.floor(Math.random() * 5) + 95; // 95% a 99%
+
+            // Crear el elemento de lista de la nueva alerta
+            const newAlertItem = document.createElement('li');
+            newAlertItem.className = 'p-3 border border-alert-critical/30 rounded-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition duration-150 animate-pulse';
+            newAlertItem.id = `alert-${newBinName}`;
+            newAlertItem.setAttribute('data-alert-id', newAlertID);
+            newAlertItem.innerHTML = `
+                <span class="font-bold text-alert-critical">🔴 ¡NUEVA! ${newBinName}: Lleno al ${fillLevel}%</span>
+                <button onclick="openModal('asignarRecoleccion', '${newAlertID}')" class="text-alert-critical hover:underline font-bold text-sm">ASIGNAR AHORA</button>
+            `;
+            
+            // Insertar la nueva alerta al principio de la lista
+            tablaAlertas.prepend(newAlertItem);
+
+            // Actualizar el contador de tarjetas (metric card)
+            updateAlertCount(1); // Aumentar en 1
+            
+            // Eliminar la animación de pulso después de un breve tiempo
+            setTimeout(() => {
+                newAlertItem.classList.remove('animate-pulse');
+            }, 5000);
+
+            console.log(`[IoT Simulación] Nueva Alerta Crítica generada: ${newBinName}`);
+        }
+
+
+        // 6. Actualiza el contador en la tarjeta principal de métricas.
+        function updateAlertCount(change) {
+            const card = document.querySelector('.border-alert-critical .text-4xl');
+            let currentCount = parseInt(card.textContent);
+            currentCount += change;
+            card.textContent = currentCount;
+        }
+
+        // 7. Marca una alerta como resuelta (simula la acción final).
+        function markAlertResolved(alertId) {
+            alert(`Alerta ${alertId} marcada como resuelta. Proceso completado.`);
+            
+            // Eliminar la fila de la alerta de la lista
+            const rowToRemove = document.querySelector(`li[data-alert-id="${alertId}"]`);
+            if (rowToRemove) {
+                rowToRemove.remove();
+            }
+            
+            // Opcional: Reducir el contador si la alerta no se había reducido antes (Esto ya lo maneja markAlertAssigned)
+             const card = document.querySelector('.border-alert-critical .text-4xl');
+             let currentCount = parseInt(card.textContent);
+             if (currentCount > 0) {
+                 // Si la alerta aún está en el contador (por si se resuelve sin ser asignada), la quitamos
+                 // Lo dejaremos como está para evitar dobles decrementos, ya que `markAlertAssigned` la quita del contador.
+             }
+        }
+
+        // 8. Reinicializa o inicia el gráfico y la simulación
+        function initializeDashboard() {
+            // 1. Inicializar el gráfico (siempre)
+            initializeReciclajeChart(); 
+            
+            // 2. Iniciar la simulación de alertas (polling cada 60 segundos)
+            if (alertSimulatorInterval) {
+                clearInterval(alertSimulatorInterval); // Limpiar si ya existe
+            }
+            // La simulación genera una nueva alerta cada 60 segundos
+            alertSimulatorInterval = setInterval(simulateIoTAlert, 60000); 
+            
+            // Mensaje de feedback
+            console.log("Dashboard Inicializado. Simulación IoT activa (una nueva alerta cada 60s).");
+        }
+        
+        // Función placeholder de cerrar sesión
+        function cerrarSesion() {
+            alert('Cerrando sesión del Administrador.');
+            // Aquí iría la lógica de redirección o limpieza de sesión
+        }
+
+
+        // Cierra el modal al hacer clic fuera del contenido (event listener)
+        document.getElementById('mainModal').addEventListener('click', function(e) {
+             // Si el objetivo del click es el overlay (el fondo gris), entonces llama a closeModal.
+             // Esto se asegura ya que hemos detenido la propagación del evento dentro del modal-content.
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Inicializa el gráfico y la simulación al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            // Llamar a initializeDashboard que se encarga de todo.
+            initializeDashboard();
+            showAdminScreen('dashboard', initializeDashboard); 
+        });
+    </script>
 </body>
 </html>
