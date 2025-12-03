@@ -1,107 +1,788 @@
-// Variable global para mantener el intervalo de simulación
-let alertSimulatorInterval = null; 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de Administrador - SINTAC Prototipo (6/5 IoT Simulación)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-dark': ' #004D40', // Verde Oscuro (Sidebar/Header)
+                        'primary-light': '#D3EEDA', // Verde Claro (Fondo general y algunos elementos)
+                        'secondary-orange': '#FF6B3D', // Naranja (Botón Resaltado, indicadores de acción)
+                        'canjear-button': '#78B3B0', // Verde Menta
+                        'alert-critical': '#EF4444', // Rojo para Alertas IoT
+                        'alert-low': '#FBBF24', // Amarillo para Alertas Menores
+                    },
+                    boxShadow: {
+                        'custom': '0 4px 12px rgba(0, 0, 0, 0.15)', // Sombra más profesional
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f4f4f4;
+        }
+        .sidebar {
+            width: 250px;
+            min-height: 100vh;
+        }
+        .main-content {
+            margin-left: 250px;
+        }
+        /* Estilo para el elemento de navegación activo en el sidebar */
+        .nav-item.active {
+            background-color: #2E8B57;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            /* Borde izquierdo para destacar aún más */
+            border-left: 4px solid #FF6B3D; 
+        }
+        .nav-item:hover {
+             /* Mejor efecto hover */
+            background-color: #4aae72; 
+        }
+        .admin-screen {
+            display: none;
+            animation: fadeIn 0.5s ease-out;
+        }
+        .admin-screen.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Estilos de Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        /* Garantizar que el modal content no sea demasiado grande en pantallas pequeñas */
+        .modal-content {
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 90%;
+            max-width: 500px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="flex">
 
-// 4. Funciones de Modal... (otras funciones)
+    <div class="sidebar fixed top-0 left-0 bg-primary-dark shadow-2xl flex flex-col z-20">
+        
+        <div class="bg-primary-dark p-6 flex items-center justify-center border-b border-primary-light/10">
+            <svg class="w-8 h-8 text-white mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0020.57 9m-1.554-1.554L15 5m4.57 4h-4.57m3.305 4H10m4.615 4h2.527M12 20.57A8.001 8.001 0 0015 20.57M4 20.57A8.001 8.001 0 0012 20.57"></path></svg>
+            <span class="text-white font-extrabold text-xl tracking-wide">SINTAC Admin</span>
+        </div>
+        
+        <div class="flex-grow p-4 space-y-2">
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold transition duration-150 active" data-target="dashboard" onclick="showAdminScreen('dashboard', initializeDashboard)">
+                <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+            </button>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="recolecciones" onclick="showAdminScreen('recolecciones')">
+                <i class="fas fa-truck-loading mr-3"></i> Gestión de Recolecciones
+            </button>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="usuarios" onclick="showAdminScreen('usuarios')">
+                <i class="fas fa-users mr-3"></i> Gestión de Usuarios
+            </button>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="recompensas_admin" onclick="showAdminScreen('recompensas_admin')">
+                <i class="fas fa-gift mr-3"></i> Recompensas y Puntos
+            </button>
+            <button class="nav-item w-full text-left py-3 px-4 rounded-lg text-white font-semibold hover:bg-primary-light/20 transition duration-150" data-target="configuracion" onclick="showAdminScreen('configuracion')">
+                <i class="fas fa-cogs mr-3"></i> Configuración
+            </button>
+        </div>
 
-// --- NUEVA LÓGICA DE SIMULACIÓN ---
+        <div class="p-4 border-t border-primary-light/20">
+            <button onclick="cerrarSesion()" class="w-full text-left py-2 px-2 text-white font-bold hover:text-secondary-orange transition duration-150">
+                <i class="fas fa-sign-out-alt mr-3"></i> Cerrar Sesión
+            </button>
+        </div>
+    </div>
 
-// Mantiene un contador para generar ID únicos y simular la llegada de nuevas alertas
-let alertCounter = 3; 
+    <div class="main-content flex-grow p-8 bg-gray-100 min-h-screen">
+        
+        <div id="dashboard" class="admin-screen active">
+            <h1 class="text-3xl font-bold mb-8 text-primary-dark border-b-2 border-primary-light pb-4">📊 Dashboard Principal</h1>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-alert-critical transform hover:scale-[1.02] transition duration-200 cursor-pointer" onclick="showAdminScreen('recolecciones')">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">🔴 ALERTA IoT CRÍTICA</p>
+                    <p class="text-4xl font-bold text-alert-critical mt-1">3</p>
+                    <p class="text-xs text-gray-500 mt-1">Requiere asignación inmediata de vehículo</p>
+                </div>
 
-/**
- * 5. Simula la llegada de nuevas alertas IoT (o la actualización de existentes).
- */
-function simulateIoTAlert() {
-    const tablaAlertas = document.getElementById('alertaCriticalList');
-    if (!tablaAlertas) return; // Asegura que solo se ejecute si está en el dashboard
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-secondary-orange transform hover:scale-[1.02] transition duration-200 cursor-pointer" onclick="showAdminScreen('recolecciones')">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">🚛 RECOLECCIONES PENDIENTES</p>
+                    <p class="text-4xl font-bold text-secondary-orange mt-1">45</p>
+                    <p class="text-xs text-gray-500 mt-1">Total de tareas de recojo por asignar hoy</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-canjear-button">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">👥 Usuarios Registrados (Semana)</p>
+                    <p class="text-4xl font-bold text-canjear-button mt-1">120</p>
+                    <p class="text-xs text-gray-500 mt-1">Fácil de gestionar el personal</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-custom border-l-4 border-primary-dark">
+                    <p class="text-sm font-semibold text-gray-600 uppercase">⭐ PUNTOS CANJEADOS (Total)</p>
+                    <p class="text-4xl font-bold text-primary-dark mt-1">8,500</p>
+                    <p class="text-xs text-gray-500 mt-1">Fácil de configurar las recompensas</p>
+                </div>
+            </div>
 
-    // 1. Aumentar la simulación para BIN-12 (la alerta crítica existente)
-    const bin12Row = document.getElementById('alert-BIN-12');
-    if (bin12Row) {
-        // Simulación: Cambiar el estado a "CONFIRMADA" después de 30 segundos
-        setTimeout(() => {
-            bin12Row.innerHTML = `
-                <span class="font-semibold text-primary-dark">BIN-12: Contenedor Lleno al 95%</span>
-                <span class="text-xs text-gray-500 italic">Asignada a Unidad Beta</span>
-                <button onclick="markAlertResolved('ALERT-001')" class="text-green-600 hover:underline font-bold text-sm ml-auto">RESOLVER</button>
+            <div class="bg-white p-6 rounded-xl shadow-custom mb-8">
+                <h2 class="text-xl font-bold mb-4 text-alert-critical border-b pb-2">🚨 Alertas IoT Pendientes de Acción</h2>
+                <ul class="space-y-3" id="alertaCriticalList">
+                    <li class="p-3 border border-alert-critical/30 rounded-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition duration-150" id="alert-BIN-12" data-alert-id="ALERT-001">
+                        <span class="font-semibold">BIN-12: Contenedor Lleno al 95%</span>
+                        <button onclick="openModal('asignarRecoleccion', 'ALERT-001')" class="text-alert-critical hover:underline font-bold text-sm">ASIGNAR RUTA</button>
+                    </li>
+                    <li class="p-3 border border-alert-critical/30 rounded-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition duration-150" data-alert-id="ALERT-002">
+                        <span class="font-semibold">BIN-05: Sensor de Temperatura Anormal (Fuego)</span>
+                        <button onclick="openModal('asignarRecoleccion', 'ALERT-002')" class="text-alert-critical hover:underline font-bold text-sm">ENVIAR PERSONAL</button>
+                    </li>
+                    <li class="p-3 border border-alert-low/30 rounded-lg flex justify-between items-center bg-yellow-50 hover:bg-yellow-100 transition duration-150" data-alert-id="ALERT-003">
+                        <span class="font-semibold text-alert-low">BIN-20: Nivel de Batería Bajo (10%)</span>
+                        <button onclick="openModal('verDetalleRecoleccion', 'ALERT-003')" class="text-alert-low hover:underline font-bold text-sm">VER DETALLE</button>
+                    </li>
+                </ul>
+            </div>
+
+
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">Recolecciones por Mes (Kg) - Histórico</h2>
+                <div class="h-96 w-full flex items-center justify-center bg-gray-50 rounded-lg p-4">
+                    <canvas id="kgRecicladosChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="recolecciones" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">🗑️ Gestión de Recolecciones y Rutas</h1>
+            
+            <div class="flex justify-between items-center mb-4">
+                 <button onclick="openModal('crearRuta')" class="px-6 py-3 bg-secondary-orange text-white rounded-lg font-semibold shadow-md hover:bg-secondary-orange/90 transition duration-150">
+                    <i class="fas fa-route mr-2"></i> Crear Nueva Ruta Óptima
+                </button>
+                
+                <select class="p-2 border border-gray-300 rounded-md focus:ring-primary-dark focus:border-primary-dark" onchange="filterRecolecciones(this.value)">
+                    <option value="todos">Mostrar Todos</option>
+                    <option value="urgentes">Mostrar Solo Urgentes</option>
+                    <option value="asignados">Mostrar Asignados</option>
+                </select>
+            </div>
+
+
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">Solicitudes Pendientes (Alertas y Manuales)</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-primary-dark text-white">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">USUARIO / SENSOR</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">FECHA RECOJO</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">TIPO DE RESIDUOS</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ESTADO</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="tablaRecolecciones">
+                            <tr data-estado="urgentes">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">ALERT-001</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-bold">SENSOR BIN-12 (LLENO 95%)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ASIGNAR AHORA</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Plástico</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-600/20 text-red-600">URGENTE</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('asignarRecoleccion', 'ALERT-001')" class="text-primary-dark hover:text-primary-dark/80 font-bold">Asignar</button>
+                                    <button onclick="openModal('verDetalleRecoleccion', 'ALERT-001')" class="text-blue-600 hover:text-blue-800">Ver Detalle</button>
+                                </td>
+                            </tr>
+                            <tr data-estado="asignados">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">REC-002</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Ana Pérez</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2025-12-02 (15:00)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Vidrio, Papel</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-dark/20 text-primary-dark">Asignado</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('asignarRecoleccion', 'REC-002')" class="text-primary-dark hover:text-primary-dark/80 font-bold">Reasignar</button>
+                                    <button onclick="openModal('verDetalleRecoleccion', 'REC-002')" class="text-blue-600 hover:text-blue-800">Ver Detalle</button>
+                                </td>
+                            </tr>
+                            <tr data-estado="urgentes">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-yellow-600">ALERT-003</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-bold">SENSOR BIN-20 (Batería 10%)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ASIGNAR HOY</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Mantenimiento</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-600/20 text-yellow-600">MANTENIMIENTO</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('asignarRecoleccion', 'ALERT-003')" class="text-primary-dark hover:text-primary-dark/80 font-bold">Asignar</button>
+                                    <button onclick="openModal('verDetalleRecoleccion', 'ALERT-003')" class="text-blue-600 hover:text-blue-800">Ver Detalle</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="usuarios" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">👥 Gestión de Usuarios</h1>
+            
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">Lista de Usuarios Registrados</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-primary-dark text-white">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">NOMBRE</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">EMAIL</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">PUNTOS</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">101</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Fausto Medina</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">fausto.m@mail.com</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-primary-dark font-bold">120</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('editarUsuario', 'Fausto Medina')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                                    <button onclick="openModal('bloquearUsuario', 'Fausto Medina')" class="text-red-600 hover:text-red-800">Bloquear</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">102</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Ana Pérez</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ana.p@mail.com</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-primary-dark font-bold">50</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                                    <button onclick="openModal('editarUsuario', 'Ana Pérez')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                                    <button onclick="openModal('bloquearUsuario', 'Ana Pérez')" class="text-red-600 hover:text-red-800">Bloquear</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="recompensas_admin" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">🎁 Recompensas y Puntos</h1>
+            
+            <div class="bg-white p-6 rounded-xl shadow-custom">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">Catálogo de Recompensas</h2>
+                
+                <button onclick="openModal('anadirRecompensa')" class="mb-6 px-6 py-3 bg-secondary-orange text-white rounded-lg font-semibold shadow-md hover:bg-secondary-orange/90 transition duration-150">
+                    <i class="fas fa-plus mr-2"></i> Añadir Nueva Recompensa
+                </button>
+
+                <div class="space-y-4">
+                    <div class="p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:shadow-sm">
+                        <div>
+                            <p class="font-bold text-lg text-primary-dark">COMBO KFC</p>
+                            <p class="text-sm text-gray-600">Costo: <span class="font-semibold text-secondary-orange">200 Puntos</span></p>
+                        </div>
+                        <div class="space-x-3 text-sm font-medium">
+                            <button onclick="openModal('editarRecompensa', 'COMBO KFC')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                            <button onclick="openModal('eliminarRecompensa', 'COMBO KFC')" class="text-red-600 hover:text-red-800">Eliminar</button>
+                        </div>
+                    </div>
+                    <div class="p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:shadow-sm">
+                        <div>
+                            <p class="font-bold text-lg text-primary-dark">COMBO CINE</p>
+                            <p class="text-sm text-gray-600">Costo: <span class="font-semibold text-secondary-orange">150 Puntos</span></p>
+                        </div>
+                        <div class="space-x-3 text-sm font-medium">
+                            <button onclick="openModal('editarRecompensa', 'COMBO CINE')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                            <button onclick="openModal('eliminarRecompensa', 'COMBO CINE')" class="text-red-600 hover:text-red-800">Eliminar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="configuracion" class="admin-screen">
+            <h1 class="text-3xl font-bold mb-6 text-primary-dark border-b-2 border-primary-light pb-4">⚙️ Configuración del Sistema</h1>
+            
+            <div class="bg-white p-6 rounded-xl shadow-custom space-y-6">
+                
+                <div class="border-b pb-4">
+                    <h2 class="text-xl font-bold mb-3 text-primary-dark">Tarifas de Puntos por Material</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Plástico (Puntos/Kg)</label>
+                            <input type="number" value="3" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Papel/Cartón (Puntos/Kg)</label>
+                            <input type="number" value="2" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Vidrio/Metal (Puntos/Kg)</label>
+                            <input type="number" value="1" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-b pb-4">
+                    <h2 class="text-xl font-bold mb-3 text-primary-dark">Gestión de Flota y Rutas</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Número Total de Unidades</label>
+                            <input type="number" value="5" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Radio de Cobertura (Km)</label>
+                            <input type="number" value="20" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark" />
+                        </div>
+                        <button class="col-span-1 md:col-span-2 bg-canjear-button text-white px-4 py-2 rounded-lg font-semibold hover:bg-canjear-button/90 transition duration-150">
+                            Administrar Rutas y Zonas
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end">
+                    <button class="bg-primary-dark text-white px-6 py-3 rounded-lg font-bold shadow-md hover:bg-primary-dark/90 transition duration-150">
+                        Guardar Cambios de Configuración
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainModal" class="modal-overlay">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-custom" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 id="modalTitle" class="text-2xl font-bold text-primary-dark">Título del Modal</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            <div id="modalBody" class="text-gray-700">
+                </div>
+            <div id="modalFooter" class="pt-4 flex justify-end space-x-3">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        let chartInstance = null; // Variable para almacenar la instancia del gráfico
+        let alertSimulatorInterval = null; // Variable global para mantener el intervalo de simulación
+        let alertCounter = 3; // Mantiene un contador para generar ID únicos y simular la llegada de nuevas alertas
+
+        // 1. Función para cambiar de pantalla
+        function showAdminScreen(screenId, callback = null) {
+            document.querySelectorAll('.admin-screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            const activeScreen = document.getElementById(screenId);
+            if (activeScreen) {
+                activeScreen.classList.add('active');
+            }
+
+            const activeNavItem = document.querySelector(`.nav-item[data-target="${screenId}"]`);
+            if (activeNavItem) {
+                activeNavItem.classList.add('active');
+            }
+            
+            // Si salimos del dashboard, detener la simulación para ahorrar recursos
+            if(screenId !== 'dashboard' && alertSimulatorInterval) {
+                 clearInterval(alertSimulatorInterval);
+            }
+
+
+            if (callback && typeof callback === 'function') {
+                callback();
+            }
+        }
+        
+        // 2. Función para inicializar el gráfico (dinámico)
+        function initializeReciclajeChart() {
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('kgRecicladosChart');
+            
+            const data = {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                datasets: [{
+                    label: 'Kg Reciclados',
+                    data: [1200, 1500, 1300, 1800, 2000, 1700, 2200, 2500, 2300, 2700, 2900, 3100],
+                    backgroundColor: '#2E8B57', // primary-dark
+                    borderColor: '#2E8B57',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                }]
+            };
+
+            const config = {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Kilogramos (Kg)'
+                            }
+                        }
+                    }
+                }
+            };
+            
+            chartInstance = new Chart(ctx, config);
+        }
+
+        // 3. Función para filtrar recolecciones
+        function filterRecolecciones(filtro) {
+            const filas = document.getElementById('tablaRecolecciones').getElementsByTagName('tr');
+            
+            for (let i = 0; i < filas.length; i++) {
+                const estado = filas[i].getAttribute('data-estado');
+                if (filtro === 'todos' || estado === filtro) {
+                    filas[i].style.display = ''; // Mostrar
+                } else {
+                    filas[i].style.display = 'none'; // Ocultar
+                }
+            }
+        }
+
+
+        // 4. Funciones de Modal
+        function openModal(actionType, data = null) {
+            const modal = document.getElementById('mainModal');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            const footer = document.getElementById('modalFooter');
+
+            let content = '';
+            let footerContent = '';
+            
+            switch (actionType) {
+                case 'asignarRecoleccion':
+                    title.textContent = `Asignar Recolección ${data}`;
+                    content = `
+                        <p class="mb-4">Seleccione la unidad de recojo y la hora estimada para la solicitud **${data}**.</p>
+                        <div class="mt-4 space-y-3">
+                            <label class="block text-sm font-medium text-gray-700">Unidad de Flota</label>
+                            <select class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark">
+                                <option>Seleccionar...</option>
+                                <option>Unidad Alfa (Disponible)</option>
+                                <option>Unidad Beta (Disponible)</option>
+                                <option>Unidad Gamma (En Ruta)</option>
+                            </select>
+                            <label class="block text-sm font-medium text-gray-700">Hora Estimada</label>
+                            <input type="time" value="11:00" class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark"/>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Recolección ${data} Asignada!'); markAlertAssigned('${data}'); closeModal();" class="bg-primary-dark text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark/90">Confirmar Asignación</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                 case 'crearRuta':
+                    title.textContent = `Crear Nueva Ruta de Recojo`;
+                    content = `
+                        <p class="mb-4">El sistema utiliza la inteligencia artificial para optimizar las rutas automáticamente. Seleccione los parámetros.</p>
+                        <div class="mt-4 space-y-3">
+                            <label class="block text-sm font-medium text-gray-700">Seleccionar Zona de Enfoque</label>
+                            <select class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark">
+                                <option>Zona A - Cayma (Prioridad Alta)</option>
+                                <option>Zona B - Miraflores</option>
+                                <option>Todas las zonas</option>
+                            </select>
+                            <label class="block text-sm font-medium text-gray-700">Incluir alertas IoT (Críticas)</label>
+                            <input type="checkbox" checked class="h-4 w-4 text-primary-dark border-gray-300 rounded" />
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Ruta Óptima Creada y Asignada!'); closeModal();" class="bg-secondary-orange text-white px-4 py-2 rounded-lg font-semibold hover:bg-secondary-orange/90">Generar y Asignar Ruta</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'verDetalleRecoleccion':
+                    title.textContent = `Detalle de Recolección ${data}`;
+                    content = `
+                        <p class="font-bold mb-2">Información de la Solicitud ${data}</p>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong>Usuario:</strong> Fausto Medina / SENSOR BIN-12</li>
+                            <li><strong>Dirección:</strong> Av. La Paz 123, Cayma</li>
+                            <li><strong>Material:</strong> 10 Kg Plástico, 5 Kg Cartón</li>
+                            <li><strong>Estado Actual:</strong> Pendiente / URGENTE</li>
+                            <li><strong>Fecha Solicitud:</strong> 2025-11-30</li>
+                        </ul>
+                        <div class="mt-4">
+                            <button class="bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600">Ver Ubicación en Mapa</button>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cerrar</button>
+                    `;
+                    break;
+                case 'editarUsuario':
+                    title.textContent = `Editar Usuario: ${data}`;
+                    content = `
+                        <p class="mb-4">Modificando la información de **${data}**.</p>
+                        <div class="mt-4 space-y-3">
+                            <label class="block text-sm font-medium text-gray-700">Puntos Actuales</label>
+                            <input type="number" value="120" class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark"/>
+                            <label class="block text-sm font-medium text-gray-700">Rol</label>
+                            <select class="p-2 border border-gray-300 rounded-md w-full focus:ring-primary-dark focus:border-primary-dark">
+                                <option>Usuario Estándar</option>
+                                <option>Usuario VIP</option>
+                                <option>Administrador</option>
+                            </select>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Usuario ${data} Editado!'); closeModal();" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">Guardar Cambios</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'bloquearUsuario':
+                    title.textContent = `Confirmar Bloqueo de Usuario`;
+                    content = `<p class="text-red-600">¿Está seguro que desea bloquear al usuario **${data}**? Esto impedirá que inicie sesión y solicite recolecciones.</p>`;
+                    footerContent = `
+                        <button onclick="alert('Usuario ${data} Bloqueado!'); closeModal();" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Bloquear</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'anadirRecompensa':
+                    title.textContent = `Crear Nueva Recompensa`;
+                    content = `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nombre de la Recompensa</label>
+                                <input type="text" placeholder="Ej: Vaso Starbucks, Descuento 20%" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Costo en Puntos</label>
+                                <input type="number" placeholder="Ej: 150" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Descripción Breve</label>
+                                <textarea rows="3" placeholder="Detalles de la recompensa..." class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange"></textarea>
+                            </div>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Nueva Recompensa Creada!'); closeModal();" class="bg-secondary-orange text-white px-4 py-2 rounded-lg font-semibold hover:bg-secondary-orange/90">Crear Recompensa</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'editarRecompensa':
+                    title.textContent = `Editar Recompensa: ${data}`;
+                    content = `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nombre de la Recompensa</label>
+                                <input type="text" value="${data}" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Costo en Puntos</label>
+                                <input type="number" value="200" class="mt-1 p-2 border border-gray-300 rounded-md w-full focus:ring-secondary-orange focus:border-secondary-orange" />
+                            </div>
+                        </div>
+                    `;
+                    footerContent = `
+                        <button onclick="alert('Recompensa ${data} Editada!'); closeModal();" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">Guardar Cambios</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                case 'eliminarRecompensa':
+                    title.textContent = `Eliminar Recompensa`;
+                    content = `<p class="text-red-600">¿Está seguro que desea eliminar la recompensa **${data}** del catálogo?</p>`;
+                    footerContent = `
+                        <button onclick="alert('Recompensa ${data} Eliminada!'); closeModal();" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700">Eliminar</button>
+                        <button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                    `;
+                    break;
+                default:
+                    title.textContent = 'Acción Desconocida';
+                    content = '<p>No se pudo cargar el contenido de esta acción.</p>';
+                    footerContent = `<button onclick="closeModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cerrar</button>`;
+            }
+
+            body.innerHTML = content;
+            footer.innerHTML = footerContent;
+            modal.style.display = 'flex';
+        }
+
+        // FUNCIÓN closeModal CORREGIDA
+        function closeModal() {
+            document.getElementById('mainModal').style.display = 'none';
+        }
+
+        // Simula que la alerta se ha asignado y ya no es un problema crítico sin resolver
+        function markAlertAssigned(alertId) {
+             const rowToUpdate = document.querySelector(`li[data-alert-id="${alertId}"]`);
+             if (rowToUpdate) {
+                // Simular que la alerta ahora es una tarea asignada, no una alerta pendiente
+                rowToUpdate.innerHTML = `
+                    <span class="font-semibold text-primary-dark">${rowToUpdate.textContent.split(':')[0]}: Asignada (Unidad Beta)</span>
+                    <button onclick="markAlertResolved('${alertId}')" class="text-green-600 hover:underline font-bold text-sm ml-auto">MARCAR RESUELTA</button>
+                `;
+                // También actualizamos el contador principal en el dashboard
+                updateAlertCount(-1); 
+            }
+        }
+
+
+        // 5. Simula la llegada de nuevas alertas IoT (o la actualización de existentes).
+        function simulateIoTAlert() {
+            const tablaAlertas = document.getElementById('alertaCriticalList');
+            if (!tablaAlertas) return; // Asegura que solo se ejecute si está en el dashboard
+
+            // 1. Simulación: Generar una NUEVA alerta crítica
+            alertCounter++;
+            const newAlertID = `ALERT-00${alertCounter}`;
+            // Genera un nombre de BIN aleatorio para mayor realismo
+            const newBinName = `BIN-${Math.floor(Math.random() * 90) + 10}`; 
+            const fillLevel = Math.floor(Math.random() * 5) + 95; // 95% a 99%
+
+            // Crear el elemento de lista de la nueva alerta
+            const newAlertItem = document.createElement('li');
+            newAlertItem.className = 'p-3 border border-alert-critical/30 rounded-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition duration-150 animate-pulse';
+            newAlertItem.id = `alert-${newBinName}`;
+            newAlertItem.setAttribute('data-alert-id', newAlertID);
+            newAlertItem.innerHTML = `
+                <span class="font-bold text-alert-critical">🔴 ¡NUEVA! ${newBinName}: Lleno al ${fillLevel}%</span>
+                <button onclick="openModal('asignarRecoleccion', '${newAlertID}')" class="text-alert-critical hover:underline font-bold text-sm">ASIGNAR AHORA</button>
             `;
-            // También actualizamos el contador principal en el dashboard
-            updateAlertCount(-1); // Reducir en 1
-        }, 30000); // 30 segundos
-    }
+            
+            // Insertar la nueva alerta al principio de la lista
+            tablaAlertas.prepend(newAlertItem);
 
-    // 2. Simulación: Generar una NUEVA alerta crítica
-    alertCounter++;
-    const newAlertID = `ALERT-00${alertCounter}`;
-    const newBinName = `BIN-${(100 + alertCounter)}`;
+            // Actualizar el contador de tarjetas (metric card)
+            updateAlertCount(1); // Aumentar en 1
+            
+            // Eliminar la animación de pulso después de un breve tiempo
+            setTimeout(() => {
+                newAlertItem.classList.remove('animate-pulse');
+            }, 5000);
 
-    // Crear el elemento de lista de la nueva alerta
-    const newAlertItem = document.createElement('li');
-    newAlertItem.className = 'p-3 border border-alert-critical/30 rounded-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition duration-150 animate-pulse';
-    newAlertItem.id = `alert-${newBinName}`;
-    newAlertItem.setAttribute('data-alert-id', newAlertID);
-    newAlertItem.innerHTML = `
-        <span class="font-bold text-alert-critical">🔴 ¡NUEVA! ${newBinName}: Lleno al 98%</span>
-        <button onclick="openModal('asignarRecoleccion', '${newAlertID}')" class="text-alert-critical hover:underline font-bold text-sm">ASIGNAR AHORA</button>
-    `;
-    
-    // Insertar la nueva alerta al principio de la lista
-    tablaAlertas.prepend(newAlertItem);
-
-    // Actualizar el contador de tarjetas (metric card)
-    updateAlertCount(1); // Aumentar en 1
-    
-    // Eliminar la animación de pulso después de un breve tiempo
-    setTimeout(() => {
-        newAlertItem.classList.remove('animate-pulse');
-    }, 5000);
-
-    console.log(`[IoT Simulación] Nueva Alerta Crítica generada: ${newBinName}`);
-}
+            console.log(`[IoT Simulación] Nueva Alerta Crítica generada: ${newBinName}`);
+        }
 
 
-/**
- * 6. Actualiza el contador en la tarjeta principal de métricas.
- */
-function updateAlertCount(change) {
-    const card = document.querySelector('.border-alert-critical .text-4xl');
-    let currentCount = parseInt(card.textContent);
-    currentCount += change;
-    card.textContent = currentCount;
-}
+        // 6. Actualiza el contador en la tarjeta principal de métricas.
+        function updateAlertCount(change) {
+            const card = document.querySelector('.border-alert-critical .text-4xl');
+            let currentCount = parseInt(card.textContent);
+            currentCount += change;
+            card.textContent = currentCount;
+        }
 
-/**
- * 7. Marca una alerta como resuelta (simula la acción final).
- */
-function markAlertResolved(alertId) {
-    alert(`Alerta ${alertId} marcada como resuelta. Proceso completado.`);
-    
-    // Eliminar la fila de la alerta de la lista
-    const rowToRemove = document.querySelector(`li[data-alert-id="${alertId}"]`);
-    if (rowToRemove) {
-        rowToRemove.remove();
-    }
-    
-    // Opcional: Reducir el contador si la alerta no se había reducido antes
-    const card = document.querySelector('.border-alert-critical .text-4xl');
-    let currentCount = parseInt(card.textContent);
-    if (currentCount > 0) {
-         card.textContent = currentCount - 1;
-    }
-}
+        // 7. Marca una alerta como resuelta (simula la acción final).
+        function markAlertResolved(alertId) {
+            alert(`Alerta ${alertId} marcada como resuelta. Proceso completado.`);
+            
+            // Eliminar la fila de la alerta de la lista
+            const rowToRemove = document.querySelector(`li[data-alert-id="${alertId}"]`);
+            if (rowToRemove) {
+                rowToRemove.remove();
+            }
+            
+            // Opcional: Reducir el contador si la alerta no se había reducido antes (Esto ya lo maneja markAlertAssigned)
+             const card = document.querySelector('.border-alert-critical .text-4xl');
+             let currentCount = parseInt(card.textContent);
+             if (currentCount > 0) {
+                 // Si la alerta aún está en el contador (por si se resuelve sin ser asignada), la quitamos
+                 // Lo dejaremos como está para evitar dobles decrementos, ya que `markAlertAssigned` la quita del contador.
+             }
+        }
 
-// 8. Reinicializa o inicia el gráfico y la simulación
-function initializeDashboard() {
-    // 1. Inicializar el gráfico (siempre)
-    initializeReciclajeChart(); 
-    
-    // 2. Iniciar la simulación de alertas (polling cada 60 segundos)
-    if (alertSimulatorInterval) {
-        clearInterval(alertSimulatorInterval); // Limpiar si ya existe
-    }
-    // La primera alerta crítica se genera 5 segundos después de cargar el dashboard
-    alertSimulatorInterval = setInterval(simulateIoTAlert, 60000); // Genera una nueva alerta cada 60 segundos
-    
-    // Mensaje de feedback
-    console.log("Dashboard Inicializado. Simulación IoT activa (una nueva alerta cada 60s).");
-}
+        // 8. Reinicializa o inicia el gráfico y la simulación
+        function initializeDashboard() {
+            // 1. Inicializar el gráfico (siempre)
+            initializeReciclajeChart(); 
+            
+            // 2. Iniciar la simulación de alertas (polling cada 60 segundos)
+            if (alertSimulatorInterval) {
+                clearInterval(alertSimulatorInterval); // Limpiar si ya existe
+            }
+            // La simulación genera una nueva alerta cada 60 segundos
+            alertSimulatorInterval = setInterval(simulateIoTAlert, 60000); 
+            
+            // Mensaje de feedback
+            console.log("Dashboard Inicializado. Simulación IoT activa (una nueva alerta cada 60s).");
+        }
+        
+        // Función placeholder de cerrar sesión
+        function cerrarSesion() {
+            alert('Cerrando sesión del Administrador.');
+            // Aquí iría la lógica de redirección o limpieza de sesión
+        }
+
+
+        // Cierra el modal al hacer clic fuera del contenido (event listener)
+        document.getElementById('mainModal').addEventListener('click', function(e) {
+             // Si el objetivo del click es el overlay (el fondo gris), entonces llama a closeModal.
+             // Esto se asegura ya que hemos detenido la propagación del evento dentro del modal-content.
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Inicializa el gráfico y la simulación al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            // Llamar a initializeDashboard que se encarga de todo.
+            initializeDashboard();
+            showAdminScreen('dashboard', initializeDashboard); 
+        });
+    </script>
+</body>
+</html>
